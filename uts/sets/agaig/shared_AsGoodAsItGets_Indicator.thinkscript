@@ -1,0 +1,37 @@
+#CSR Buy/Sell Arrows with Short/LongHaulFilter Bubbles
+#Developed 4-9-22 First Edition
+
+declare upper;
+
+input atrreversal = 2.0;#Hint atrreversal: Turn down for more entries, up for less entries. Purple signal indicates low point reversal and close approaching Kijun. Orange signal indicates the price is crossing the Kijun. Green signal indicates the low of the candle holds over the Kijun. Red signal means reversal at a high point.   
+def priceh = MovingAverage(AverageType.EXPONENTIAL, high, 5); 
+def pricel = MovingAverage(AverageType.EXPONENTIAL, low, 5); 
+
+def EIL = ZigZagHighLow("price h" = priceh, "price l" = pricel, "percentage reversal" = .01, "absolute reversal" = .05, "atr length" = 5, "atr reversal" = atrreversal).lastL; 
+def EIH = ZigZagHighLow("price h" = priceh, "price l" = pricel, "percentage reversal" = .01, "absolute reversal" = .05, "atr length" = 5, "atr reversal" = atrreversal).lastH; 
+
+def kijun_period = 26;
+def Kijun = (Highest(high, kijun_period) + Lowest(low, kijun_period)) / 2;
+def avgPerc = ((Kijun - close) / Kijun) * 100;
+
+plot signal = !isNaN(EIL) within 15 bars and low < Kijun and avgPerc < 15 and avgPerc > 0 and avgPerc[1] < avgPerc;
+signal.setDefaultColor(color.white);
+
+plot KijunCross = signal within 10 bars and Crosses(close, kijun, CrossingDirection.ABOVE);
+kijuncross.setDefaultColor(color.white);
+
+def overKijun = (kijunCross within 10 bars or overKijun[1] == 1) and low > kijun;
+plot overKijun1 = overKijun;
+overKijun1.setDefaultcolor(color.white);
+
+plot signaldown = !isNAN(EIH);
+signaldown.SetPaintingStrategy(PaintingStrategy.BOOLEAN_ARROW_down); AddLabel(!isNAN(EIH),"Short 1.75 ATR",color.White);
+
+AddChartBubble(SignalDown, high, "SHORT", Color.White, no);
+
+
+
+plot signalrevBot = !isNaN(EIL);
+
+AddChartBubble(Signalrevbot, low, "LONG", Color.White, yes);
+AddLabel(!isNan(EIL), "LONG", Color.GREEN);

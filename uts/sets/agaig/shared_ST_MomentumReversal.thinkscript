@@ -1,0 +1,37 @@
+# ST_MomentumReversal
+# (c) 2025 Simpler Trading LLC
+# By Eric Purdy
+# 05/20/25
+
+input signalWindow = 5;
+
+def sDev = stdev(close, 20);
+def MidLine = MovingAverage(AverageType.Simple, close, 20);
+def LowerBand = MidLine + -2.0 * sDev;
+def UpperBand = MidLine + 2.0 * sDev;
+def PH = if high >= UpperBand then 1 else PH[1] + 1;
+def PL= if low <= LowerBand then 1 else PL[1] + 1;
+def lowBar = low == Lowest(low, 21);
+def HOLB = if lowBar then high else HOLB[1];
+def closedAboveHOLB = if lowBar then 0 else if close > HOLB then closedAboveHOLB[1]+1 else closedAboveHOLB[1];
+def buy = closedAboveHOLB == 1 and closedAboveHOLB[1] == 0;
+def highBar = high == Highest(high, 21);
+def LOHB = if highBar then low else LOHB[1];
+def closedBelowLOHB = if highBar then 0 else if close < LOHB then closedBelowLOHB[1]+1 else closedBelowLOHB[1];
+def sell = closedBelowLOHB == 1 and closedBelowLOHB[1] == 0;
+
+plot ReversalBuySignal = buy and PL <= signalWindow;
+ReversalBuySignal.SetPaintingStrategy(PaintingStrategy.BOOLEAN_ARROW_UP);
+ReversalBuySignal.setDefaultColor(color.green);
+ReversalBuySignal.setLineWeight(5);
+
+plot ReversalSellSignal = sell and PH <= signalWindow;
+ReversalSellSignal.SetPaintingStrategy(PaintingStrategy.BOOLEAN_ARROW_DOWN);
+ReversalSellSignal.setDefaultColor(color.red);
+ReversalSellSignal.setLineWeight(5);
+
+plot SellScan = sell and PH <= signalWindow;
+sellScan.hide();
+
+plot BuyScan = buy and PL <= signalWindow;
+buyScan.hide();

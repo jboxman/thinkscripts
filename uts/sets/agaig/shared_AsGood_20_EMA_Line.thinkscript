@@ -1,0 +1,5 @@
+input price = close;
+input length = 20;
+input displace = 0;
+
+plot AvgExp = ExpAverage(price[-displace], length);

@@ -1,0 +1,85 @@
+#orb_colors_03
+#Mobius original
+#csricksdds  2/20
+#I like your ORB indicator with the labels that show when above/below...so that the labels don't show only when above/below can you add one showing Yellow "Trading within ORB" when it's trading within?
+#Thanks to halcyonguy I have made a few changes to suit myself.
+#https://usethinkscript.com/threads/shaded-opening-range-no-breakout.17922/
+#Shaded Opening Range (No Breakout)
+# 2020-01
+# halcyonguy
+#Revamped by C. Ricks 2/12/24
+declare upper;
+input LabelSize = fontsize.medium;
+input LabelLocation = location.top_left;
+
+def na = Double.NaN;
+
+# pick an agg time
+input orb_time = AggregationPeriod.fifteen_min;
+def orb_min = orb_time/60000;
+def per = orb_min;
+
+# open/close times  (ET)
+input start = 0930;
+input end = 1600;
+def daytime = if secondsfromTime(start) >= 0 and secondstillTime(end) > 0 then 1 else 0;
+
+def durationsec = per * 60;
+def secondspassed = secondsfromTime(start);
+#  simulated firstbar , based on orb time
+def firstbar = if secondspassed >= 0 and secondspassed < durationsec then 1 else 0;
+#addchartbubble(yes,low,per + "__" + firstbar);
+
+def ehi = high(period = orb_time);
+def elo = low(period = orb_time);
+
+#  looks at firstbar ,  which is orbtime ,  NOT bar[1]
+def perhigh = if !daytime then na else if firstbar then ehi else perhigh[1];
+def perlow = if !daytime then na else if firstbar then elo else perlow[1];
+
+# .....................................................
+
+
+addlabel(1, " ", color.Yellow,  labellocation, labelsize);
+
+addlabel((close > perhigh),"Price Above ORB", color.green,  labellocation, labelsize);
+
+addlabel((close < perlow),"Price Below ORB", color.red,  labellocation, labelsize);
+
+addlabel((close <= perhigh and close >= perlow),"Price Inside ORB", color.yellow);
+addlabel(1, " ", color.Yellow,  labellocation, labelsize);
+
+
+# .....................................................
+
+# plot dots for first bar timeframe
+plot hidots = if firstbar then perhigh else na;
+plot lodots = if firstbar then perlow else na;
+hidots.setpaintingStrategy(paintingStrategy.Dashes);
+lodots.setpaintingStrategy(paintingStrategy.Dashes);
+hidots.setDefaultColor(color.yellow);
+lodots.setDefaultColor(color.yellow);
+
+
+# plot line after first bar 
+plot hiline = if !firstbar then perhigh else na;
+plot loline = if !firstbar then perlow else na;
+hiline.setpaintingStrategy(paintingStrategy.LINE);
+loline.setpaintingStrategy(paintingStrategy.LINE);
+hiline.setDefaultColor(color.yellow);
+loline.setDefaultColor(color.yellow);
+
+plot static = hiline;
+static.AssignValueColor(Color.Yellow);
+
+def limit = !IsNaN(close) and IsNaN(close [-1] ) && LowestAll(BarNumber());
+
+AddChartBubble(limit, static, "ORB HI", Color.Yellow);
+
+
+plot static2 = loline;
+static2.AssignValueColor(Color.Yellow);
+
+def limit2 = !IsNaN(close) and IsNaN(close [-1] ) && LowestAll(BarNumber());
+
+AddChartBubble(limit2, static2, "ORB LO", Color.YELLOW);

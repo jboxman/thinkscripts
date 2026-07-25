@@ -1,0 +1,14 @@
+# Label_ATR_DWM
+
+
+input length = 12;
+input averageType = AverageType.Exponential;
+input LabelSize = FontSize.MEDIUM;
+input LabelLocation = Location.TOP_LEFT;
+
+
+defineGlobalColor("LabelColor", color.Cyan);
+def ATRd = MovingAverage(averageType, TrueRange(Fundamental(FundamentalType.HIGH, period = aggregationPeriod.DAY), Fundamental(FundamentalType.CLOSE, period = aggregationPeriod.DAY), Fundamental(FundamentalType.LOW, period = aggregationPeriod.DAY)), length);
+def ATRw = MovingAverage(averageType, TrueRange(Fundamental(FundamentalType.HIGH, period = aggregationPeriod.WEEK), Fundamental(FundamentalType.CLOSE, period = aggregationPeriod.WEEK), Fundamental(FundamentalType.LOW, period = aggregationPeriod.WEEK)), length);
+def ATRm = MovingAverage(averageType, TrueRange(Fundamental(FundamentalType.HIGH, period = aggregationPeriod.MONTH), Fundamental(FundamentalType.CLOSE, period = aggregationPeriod.MONTH), Fundamental(FundamentalType.LOW, period = aggregationPeriod.MONTH)), length);
+addLabel(Yes, "ATR(" + length + ") D:" + round(ATRd, 1) + " W:" + round(ATRw, 1) + " M:" + round(ATRm, 1), GlobalColor("LabelColor"), LabelLocation, LabelSize);

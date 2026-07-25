@@ -1,0 +1,33 @@
+# AsGoodAsItGets upper Indicator
+#CSR Buy/Sell Arrows with Short/Long Bubbles
+#Developed 4-23-23 First Edition 8-23-22 Revised
+#Updated 3/16/24 by C. Ricks
+
+declare lower;
+
+input atrreversal =2.0;
+
+def priceh = MovingAverage(AverageType.EXPONENTIAL, high, 5);
+def pricel = MovingAverage(AverageType.EXPONENTIAL, low, 5);
+
+def EIL = ZigZagHighLow("price h" = priceh, "price l" = pricel, "percentage reversal" = .01, "absolute reversal" = .05, "atr length" = 5, "atr reversal" = atrreversal).lastL;
+def EIH = ZigZagHighLow("price h" = priceh, "price l" = pricel, "percentage reversal" = .01, "absolute reversal" = .05, "atr length" = 5, "atr reversal" = atrreversal).lastH;
+
+plot signaldown = !isNAN(EIH); 
+signaldown.SetPaintingStrategy(PaintingStrategy.SQUARED_HISTOGRAM);
+signaldown.DefineColor("signaldown", Color.Red);
+
+
+
+
+plot signalrevBot = !isNaN(EIL);
+
+Signalrevbot.SetPaintingStrategy(PaintingStrategy.SQUARED_HISTOGRAM);
+signalrevBot.DefineColor("signalrevBot", Color.Green);
+
+input usealerts = yes;
+alert(usealerts and signaldown[1] == 1, "SHORT", alert.bar, sound.ring);
+alert(usealerts and signalrevbot[1] == 1, "LONG", alert.bar, sound.ring);
+
+
+

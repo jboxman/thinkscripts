@@ -1,0 +1,24 @@
+#CSR Buy/Sell Arrows with Short/LongHaulFilter Bubbles
+#Developed 4-9-22 First Edition
+#Modified by C. Ricks to show direction arrows only (Large Yellow Arroews Up/Down
+
+declare upper;
+
+input atrreversal = 2.0;#Hint atrreversal: Turn down for more entries, up for less entries. Purple signal indicates low point reversal and close approaching Kijun. Orange signal indicates the price is crossing the Kijun. Green signal indicates the low of the candle holds over the Kijun. Red signal means reversal at a high point.
+def priceh = MovingAverage(AverageType.EXPONENTIAL, high, 5);
+def pricel = MovingAverage(AverageType.EXPONENTIAL, low, 5);
+
+def EIL = ZigZagHighLow("price h" = priceh, "price l" = pricel, "percentage reversal" = .01, "absolute reversal" = .05, "atr length" = 5, "atr reversal" = atrreversal).lastL;
+def EIH = ZigZagHighLow("price h" = priceh, "price l" = pricel, "percentage reversal" = .01, "absolute reversal" = .05, "atr length" = 5, "atr reversal" = atrreversal).lastH;
+
+plot signaldown = !isNAN(EIH);
+signaldown.SetPaintingStrategy(PaintingStrategy.BOOLEAN_ARROW_down);
+signaldown.setdefaultcolor (CreateColor (255, 255, 0));
+
+
+
+plot signalrevBot = !isNaN(EIL);
+signalrevBot.SetPaintingStrategy(PaintingStrategy.BOOLEAN_ARROW_up);
+signalrevBot.setdefaultcolor (CreateColor (255, 255, 0));
+
+#End Code

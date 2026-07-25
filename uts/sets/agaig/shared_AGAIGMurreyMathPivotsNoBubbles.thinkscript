@@ -1,0 +1,53 @@
+#Murrays's Math Trendflex Dydtem forceIndex TOS
+#Revamped by Charles Ricks 8/22/24
+
+def showOnlyToday = yes;
+def RangeHigh = high(period = "DAY")[0];
+def RangeLow = low(period = "DAY")[0];
+def RangeSize = AbsValue(RangeHigh - RangeLow);
+def MMLevel7 = 7 / 8;
+
+def MMLevel1 = 1 / 8;
+def MML8 = RangeHigh;
+def MML7 = RangeLow + RangeSize * (MMLevel7);
+
+def MML1 = RangeLow + RangeSize * (MMLevel1);
+def MML0 = RangeLow;
+plot Level8;
+plot Level7;
+
+plot Level1;
+plot Level0;
+if showOnlyToday and !IsNaN(close(period = "DAY")[-1])
+then {
+Level8 = Double.NaN;
+Level7 = Double.NaN;
+
+Level1 = Double.NaN;
+Level0 = Double.NaN;
+} else {
+Level8 = MML8;
+Level7 = MML7;
+
+Level1 = MML1;
+Level0 = MML0;
+}
+
+Level1.SetDefaultColor(color.Yellow);
+Level1.SetStyle(curve.Short_Dash);
+Level7.HideBubble();
+
+
+Level8.SetDefaultColor(color.RED);
+Level8.SetStyle(curve.Short_Dash);
+Level8.HideBubble();
+
+Level7.SetDefaultColor(color.Yellow);
+Level7.SetStyle(curve.Short_Dash);
+Level7.HideBubble();
+
+
+
+Level0.SetDefaultColor(color.Green);
+Level0.SetStyle(curve.short_dash);
+Level0.HideBubble();

@@ -1,0 +1,90 @@
+declare upper;
+
+# ──────────────────────────────────────────────────────────────────
+#  Inputs
+# ──────────────────────────────────────────────────────────────────
+input LabelSize = FontSize.MEDIUM;
+input LabelLocation = Location.TOP_LEFT;
+
+
+# Volume Pressure Inputs
+input Volume_AvgType    = AverageType.EXPONENTIAL;
+input Volume_Length     = 6;
+
+# ───────────────────────────────────────────────────────────────────────
+#  Raw Data
+# ───────────────────────────────────────────────────────────────────────
+def vol        = volume;
+def selling    = vol * (high - close) / (high - low);
+def buying     = vol * (close - low) / (high - low);
+
+def buyV_ma   = MovingAverage(Volume_AvgType, buying, Volume_Length);
+def sellV_ma  = MovingAverage(Volume_AvgType, selling, Volume_Length);
+
+addlabel(yes, GetSymbol() +": " + round(buyV_ma - sellV_ma,0), if buyV_ma > sellV_ma then color.green else  Color.RED,  LabelLocation, LabelSize);
+
+
+
+plot ZeroLine = 0;
+plot neg1Line = -1;
+plot neg2Line = -2;
+
+
+
+
+
+# ────────────────────────────────────────────────────────────────────────
+#  4) Magnificent Seven aggregate dots at 0/100
+# ────────────────────────────────────────────────────────────────────────
+script VolumePressure {
+    input sym = "AAPL";
+    def o = open(sym);
+    def h = high(sym);
+    def l = low(sym);
+    def c = close(sym);
+    def v = volume(sym);
+
+    def uw  = if c>o then h-c else h-o;
+    def lw  = if c>o then o-l else c-l;
+    def sp  = h - l;
+    def bd  = sp - (uw + lw);
+    def pctB= bd / sp;
+    def pctW= (uw + lw) / sp;
+
+    def buyR  = if c>o then (pctB + pctW/2) * v else (pctW/2) * v;
+    def sellR = if c<o then (pctB + pctW/2) * v else (pctW/2) * v;
+
+    plot Buy  = MovingAverage(AverageType.EXPONENTIAL, buyR, 14);
+    plot Sell = MovingAverage(AverageType.EXPONENTIAL, sellR, 14);
+}
+
+def avgBuy  = ( VolumePressure("AAPL").Buy +
+                VolumePressure("MSFT").Buy +
+                VolumePressure("GOOGL").Buy +
+                VolumePressure("AMZN").Buy +
+                VolumePressure("META").Buy +
+                VolumePressure("TSLA").Buy +
+                VolumePressure("NVDA").Buy ) / 7;
+
+def avgSell = ( VolumePressure("AAPL").Sell +
+                VolumePressure("MSFT").Sell +
+                VolumePressure("GOOGL").Sell +
+                VolumePressure("AMZN").Sell +
+                VolumePressure("META").Sell +
+                VolumePressure("TSLA").Sell +
+                
+                VolumePressure("NVDA").Sell ) / 7;
+
+addlabel(yes, "Mag 7: " + round(avgBuy - avgSell,0), if avgBuy > avgSell then color.green else  Color.RED,  LabelLocation, LabelSize);
+
+
+def qqqBuy  =  VolumePressure("QQQ").Buy;
+def qqqSell  =  VolumePressure("QQQ").Sell;
+addlabel(yes, "QQQ: " + round(qqqBuy - qqqSell,0), if qqqBuy > qqqSell then color.green else  Color.RED,  LabelLocation, LabelSize);
+
+
+
+def spyBuy  =  VolumePressure("SPY").Buy;
+def spySell  =  VolumePressure("SPY").Sell;
+addlabel(yes, "SPY: " + round(spyBuy - spySell,0), if spyBuy > spySell then color.green else   Color.RED,  LabelLocation, LabelSize);
+

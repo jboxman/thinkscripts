@@ -1,0 +1,256 @@
+#trend, a momentum and a cycle based indicator for ThinkorSwim V2.0
+#@hockeycoachdoug Community Request
+
+# 2019.12.30 V1.0 @diazlaz - Community Ask/Release
+#https://usethinkscript.com/threads/i-request-help-combining-3-indicators-into-1-paintbar-study.1390/
+#Modified by C. Ricks 12/13/23
+#Modified by C. Ricks 7/21/24 for Red/Green Trading Lights Only
+
+declare upper;
+input LabelSize = fontsize.medium;
+input LabelLocation = location.top_left;
+
+
+#INPUTS
+input showLabels = yes;
+input aggregationPeriod = AggregationPeriod.FIVE_MIN;
+input threshold = 7;
+
+input enableHA = yes;
+input enableHAMTF = yes;
+input enableTTM = yes;
+input enableSuperTrend = yes;
+input enableFrema = yes;
+input enableTMO = yes;
+input enableSlim = yes;
+input enableTOP = yes;
+input enableDMI = yes;
+input enableBOP = yes;
+input enableSuperTrendCCIATR = yes;
+input enableCCITTM = yes;
+
+input displace = 0;
+
+def h = high;
+def l = low;
+def o = open;
+def c = close;
+
+def h1 = high(period = aggregationPeriod);
+def l1 = low(period = aggregationPeriod);
+def o1 = open(period = aggregationPeriod);
+def c1 = close(period = aggregationPeriod);
+
+#HeikinAshiCandles
+def HA1open;
+def HA1close;
+HA1open = CompoundValue(1, (HA1open[1] + HA1close[1]) / 2, (o[1] + c[1]) / 2);
+HA1close = (o + h + l + c) / 4;
+def sHA1 = if HA1close > HA1open then 100 else -100;
+def sBullish_HA1 = if(enableHA and sHA1 == 100,1,0);
+def sBearish_HA1 = enableHA and sHA1 == -100;
+
+#HeikinAshiCandles MTF
+def HA2open;
+def HA2close;
+HA2open = CompoundValue(1, (HA2open[1] + HA2close[1]) / 2, (o1[1] + c1[1]) / 2);
+HA2close = (o1 + h1 + l1 + c1) / 4;
+def sHA2 = if HA2close > HA2open then 100 else -100;
+def sBullish_HA2 = if(enableHAMTF and sHA2 == 100,1,0);
+def sBearish_HA2 = enableHAMTF and sHA2 == -100;
+
+
+#TTM Trend
+def TrendUp = if TTM_Trend().TrendUp == 1 then 1 else 0;
+def TrendDown = if TTM_Trend().TrendDown == 1 then 1 else 0;
+def sTTM = if TrendUp then 100 else if TrendDown then -100 else 0;
+def sBullish_TTM = if(enableTTM and sTTM == 100,1,0);
+def sBearish_TTM = enableTTM and sTTM == -100;
+
+#SuperTrend (Mobius)
+input AtrMult = 2.5; #SuperTrend
+input nATR = 4; #SuperTrend
+input AvgType = AverageType.Exponential; #SuperTrend
+
+def ATR = MovingAverage(AvgType, TrueRange(high, close, low), nATR);
+def UP = HL2 + (AtrMult * ATR);
+def DN = HL2 + (-AtrMult * ATR);
+def ST = if close < ST[1] then UP else DN;
+def sSuperTrend = if close < ST then -100 else 100;
+def sBullish_SuperTrend = enableSuperTrend and sSuperTrend == 100;
+def sBearish_SuperTrend = enableSuperTrend and sSuperTrend == -100;
+
+#FREMA
+input AA = .1; #FREMA
+
+def CC;
+def zeroLine = 0;
+def RE1;
+def RE2;
+def RE3;
+def RE4;
+def RE5;
+def RE6;
+def RE7;
+def RE8;
+def EMA;
+CC = if CC[1] == 0 then .9 else 1 - AA;
+EMA = AA * close + CC * EMA[1];
+RE1 = CC * EMA + EMA[1];
+RE2 = Power(CC, 2) * RE1 + RE1[1];
+RE3 = Power(CC, 4) * RE2 + RE2[1];
+RE4 = Power(CC, 8) * RE3 + RE3[1];
+RE5 = Power(CC, 16) * RE4 + RE4[1];
+RE6 = Power(CC, 32) * RE5 + RE5[1];
+RE7 = Power(CC, 64) * RE6 + RE6[1];
+RE8 = Power(CC, 128) * RE7 + RE7[1];
+def EMA_Signal = EMA - AA * RE8;
+def sFrema = if (EMA_Signal > zeroLine) then 100 else -100;
+def sBullish_Frema = enableFrema and sFrema == 100;
+def sBearish_Frema = enableFrema and sFrema == -100;
+
+#TMO
+input length = 14; #TMO
+input calcLength = 5; #TMO
+input smoothLength = 3; #TMO
+
+def data = fold i = 0 to length
+with s
+do s + (if c > getValue(o, i)
+then 1
+else if c < getValue(o, i)
+then - 1
+else 0);
+def EMA5 = ExpAverage(data, calcLength);
+def Main = ExpAverage(EMA5, smoothLength);
+def Signal = ExpAverage(Main, smoothLength);
+def sTMO = if Main > Signal then 100 else -100;
+def sBullish_TMO = enableTMO and sTMO == 100;
+def sBearish_TMO = enableTMO and sTMO == -100;
+
+
+#SLIM
+input sSuperFast = 8;
+input sFast = 13;
+input sSlow = 21;
+
+def SuperFastM1 = ExpAverage(close[-displace], sSuperFast);
+def FastM1 = ExpAverage(close[-displace], sFast);
+def SlowM1 = ExpAverage(close[-displace], sSlow);
+def buyM1 = SuperFastM1 > FastM1 and FastM1 > SlowM1 and low > SuperFastM1;
+def stopbuyM1 = SuperFastM1 <= FastM1;
+def buynowM1 = !buyM1[1] and buyM1;
+def buysignalM1 = CompoundValue(1, if buynowM1 and !stopbuyM1 then 1
+else if buysignalM1[1] == 1 and stopbuyM1 then 0 else buysignalM1[1], 0);
+def Buy_SignalM1 = buysignalM1[1] == 0 and buysignalM1 == 1;
+def Momentum_DownM1 = buysignalM1[1] == 1 and buysignalM1 == 0;
+def sellM1 = SuperFastM1 < FastM1 and FastM1 < SlowM1 and high < SuperFastM1;
+def stopsellM1 = SuperFastM1 >= FastM1;
+def sellnowM1 = !sellM1[1] and sellM1;
+def sellsignalM1 = CompoundValue(1, if sellnowM1 and !stopsellM1 then 1
+else if sellsignalM1[1] == 1 and stopsellM1 then 0 else sellsignalM1[1], 0);
+def Sell_SignalM1 = sellsignalM1[1] == 0 and sellsignalM1;
+def Momentum_UpM1 = sellsignalM1[1] == 1 and sellsignalM1 == 0;
+def sStateM1 = if Buy_SignalM1 then 100 else if Momentum_UpM1 then 10 else if Sell_SignalM1 then -100 else if Momentum_DownM1 then -10 else sStateM1[1];
+def sBullish_SLIM = enableSLIM and sStateM1 == 100;
+def sBearish_SLIM = enableSLIM and sStateM1 == -100;
+
+
+
+#TOP Cycle Trader
+input FastCycleLength = 5; #TOP
+input SlowCycleLength = 8; #TOP
+
+def FastVar = ExpAverage((H + L) / 2, FastCycleLength);
+def SlowVar = Average((H + L) / 2, SlowCycleLength);
+def DiffVar = FastVar - SlowVar;
+def sTOP = if DiffVar > 0 then 100 else -100;
+def sBullish_TOP = enableTOP and sTOP == 100;
+def sBearish_TOP = enableTOP and sTOP == -100;
+
+#DMITrend
+input DMIlength = 13;
+
+def hiDiff = high - high[1];
+def loDiff = low[1] - low;
+def plusDM = if hiDiff > loDiff and hiDiff > 0 then hiDiff else 0;
+def minusDM = if loDiff > hiDiff and loDiff > 0 then loDiff else 0;
+def ATRDMI = WildersAverage(TrueRange(high, close, low), DMIlength);
+Def DIPlus = 100 * WildersAverage(plusDM, DMIlength) / ATRDMI;
+Def DIMinus = 100 * WildersAverage(minusDM, DMIlength) / ATRDMI;
+def sDMI = if DIPlus > DIMinus then 100 else if DIMinus > DIPlus then -100 else 0;
+def sBullish_DMI = enableDMI and sDMI == 100;
+def sBearish_DMI = enableDMI and sDMI == -100;
+
+#BOP indicator
+input averageType = {Simple, Exponential, default Weighted, Wilders, Hull, Disabled};
+input BoPlength = 16;
+
+def rawBMP = if high != low then (close - open) / (high - low) else 1;
+def BMP;
+switch (averageType) {
+case Simple:
+BMP = Average(rawBMP, BoPlength);
+case Exponential:
+BMP = ExpAverage(rawBMP, BoPlength);
+case Weighted:
+BMP = wma(rawBMP, BoPlength);
+case Wilders:
+BMP = WildersAverage(rawBMP, BoPlength);
+case Hull:
+BMP = HullMovingAvg(rawBMP, BoPlength);
+case Disabled:
+BMP = rawBMP;
+}
+def sBOP = if BMP > 0 then 100 else -100;
+def sBullish_BOP = enableBOP and sBOP == 100;
+def sBearish_BOP = enableBOP and sBOP == -100;
+
+# SUPERTREND BY MOBIUS AND CCI ATR TREND COMBINED
+input lengthCCI = 50;
+input lengthATR = 21;
+input AtrFactor = 1.0;
+def pricedata = hl2;
+def ATRcci = Average(TrueRange(h, c, l), lengthATR) * AtrFactor;
+def price = c + l + h;
+def linDev = LinDev(price, lengthCCI);
+def cciTrend = if linDev == 0
+then 0
+else (price - Average(price, lengthCCI)) / linDev / 0.015;
+def MT1 = if cciTrend > 0
+then Max(MT1[1], pricedata - ATRcci)
+else Min(MT1[1], pricedata + ATRcci);
+def sSuperTrendCCIATR = if c < MT1 and c < ST then -100 else if C > MT1 and c >ST then 100 else 0;
+def sBullish_SuperTrendCCIATR = enableSuperTrendCCIATR and sSuperTrendCCIATR == 100;
+def sBearish_SuperTrendCCIATR = enableSuperTrendCCIATR and sSuperTrendCCIATR == -100;
+
+# CCI + TTM squeeze + TTM trend
+def CCIBuy = CCI(length = 14).CCI > 0 and CCI(length = 50).CCI > 0;
+def CCISell = CCI(length = 14).CCI < 0 and CCI(length = 50).CCI < 0;
+def sTrendUp = TTM_Trend().TrendUp;
+def sTrendDn = TTM_Trend().TrendDown;
+def SqueezeUp = TTM_Squeeze().Histogram >= 0;
+def SqueezeDn = TTM_Squeeze().Histogram <= 0;
+def Buy = CCIBuy and sTrendUp and SqueezeUp;
+def Sell = CCISell and sTrendDn and SqueezeDn;
+def sCCITTM = if buy then 100 else if sell then -100 else 0;
+def sBullish_CCITTM = enableCCITTM and sCCITTM == 100;
+def sBearish_CCITTM = enableCCITTM and sCCITTM == -100;
+
+#STATE
+def sBullish = sBullish_HA1 + sBullish_HA2 + sBullish_TTM + sBullish_SuperTrend + sBullish_Frema + sBullish_TMO + sBullish_TOP + sBullish_DMI + sBullish_BOP + sBullish_SLIM + sBullish_SuperTrendCCIATR + sBullish_CCITTM;
+def sBearish = sBearish_HA1 + sBearish_HA2 + sBearish_TTM + sBearish_SuperTrend + sBearish_Frema + sBearish_TMO + sBearish_TOP + sBearish_DMI + sBearish_BOP + sBearish_SLIM + sBearish_SuperTrendCCIATR + sBearish_CCITTM;
+def bullish = if(sBullish >= threshold,1,0);
+def bearish = if(sBearish >= threshold,1,0);
+
+AddLabel(showlabels,
+if bullish[-displace] then "Green Light" else
+if bearish[-displace] then "RED Light"
+else "Caution Light",
+if IsNan(c) then COLOR.Yellow else
+if bullish[-displace] then COLOR.GREEN else
+if bearish[-displace] then COLOR.RED
+else COLOR.yellow,labellocation, labelsize);
+
+
+#END OF trend, a momentum and a cycle based indicator for ThinkorSwim V2.0

@@ -1,0 +1,302 @@
+# AGAIG Minimal Intraday Stack
+# Combines a small set of studies that use meaningfully different information:
+# session structure, volume-weighted location, volatility, participation,
+# a price/volatility reversal setup, and one simple trend reference.
+#
+# Component provenance retained from the source studies:
+#
+# Opening Range
+# Mobius original
+# halcyonguy "Shaded Opening Range (No Breakout)"
+# https://usethinkscript.com/threads/shaded-opening-range-no-breakout.17922/
+# Revamped by C. Ricks 2/12/24
+#
+# VWAP
+# "Buy/Sell by Prakash EEE"
+# Converted by Sam4Cok@Samer800 07/2024
+# Revamped by C. Ricks to show VWAP only
+#
+# Relative Volume
+# AsGood_CandleVolumeStrength 1/3/23
+#
+# Momentum Reversal
+# ST_MomentumReversal
+# (c) 2025 Simpler Trading LLC
+# By Eric Purdy
+# 05/20/25
+
+declare upper;
+
+# ----------------------------------------------------------------------
+# Shared display inputs
+# ----------------------------------------------------------------------
+
+input labelSize = FontSize.MEDIUM;
+input labelLocation = Location.TOP_LEFT;
+
+# ----------------------------------------------------------------------
+# 20 EMA: simple trend reference
+# ----------------------------------------------------------------------
+
+input showEMA = yes;
+input emaPrice = close;
+input emaLength = 20;
+
+plot TrendEMA =
+    if showEMA then ExpAverage(emaPrice, emaLength) else Double.NaN;
+TrendEMA.SetDefaultColor(Color.CYAN);
+TrendEMA.SetLineWeight(2);
+TrendEMA.HideBubble();
+
+# ----------------------------------------------------------------------
+# VWAP: volume-weighted session location
+# ----------------------------------------------------------------------
+
+input showVWAP = yes;
+input vwapTimeFrame = {default DAY, WEEK, MONTH};
+
+plot VWAPLine = if showVWAP
+                then Reference VWAP(timeFrame = vwapTimeFrame).price
+                else Double.NaN;
+VWAPLine.SetDefaultColor(Color.YELLOW);
+VWAPLine.SetLineWeight(2);
+VWAPLine.HideBubble();
+
+# ----------------------------------------------------------------------
+# Opening Range: initial session structure
+# Designed for a chart aggregation no greater than the ORB aggregation.
+# Session times are Eastern Time in ThinkOrSwim.
+# ----------------------------------------------------------------------
+
+input showORB = yes;
+input showORBLabel = yes;
+input showORBBubbles = yes;
+input orbTime = AggregationPeriod.FIFTEEN_MIN;
+input sessionStart = 0930;
+input sessionEnd = 1600;
+
+def orbNa = Double.NaN;
+def orbMinutes = orbTime / 60000;
+def inRegularSession =
+    SecondsFromTime(sessionStart) >= 0 and
+    SecondsTillTime(sessionEnd) > 0;
+def secondsFromOpen = SecondsFromTime(sessionStart);
+def inOpeningRange =
+    secondsFromOpen >= 0 and
+    secondsFromOpen < orbMinutes * 60;
+
+def openingAggregationHigh = high(period = orbTime);
+def openingAggregationLow = low(period = orbTime);
+
+def openingRangeHigh =
+    if !inRegularSession then orbNa
+    else if inOpeningRange then openingAggregationHigh
+    else openingRangeHigh[1];
+
+def openingRangeLow =
+    if !inRegularSession then orbNa
+    else if inOpeningRange then openingAggregationLow
+    else openingRangeLow[1];
+
+plot ORBHighOpening =
+    if showORB and inOpeningRange then openingRangeHigh else orbNa;
+plot ORBLowOpening =
+    if showORB and inOpeningRange then openingRangeLow else orbNa;
+ORBHighOpening.SetPaintingStrategy(PaintingStrategy.DASHES);
+ORBLowOpening.SetPaintingStrategy(PaintingStrategy.DASHES);
+ORBHighOpening.SetDefaultColor(Color.YELLOW);
+ORBLowOpening.SetDefaultColor(Color.YELLOW);
+ORBHighOpening.HideBubble();
+ORBLowOpening.HideBubble();
+
+plot ORBHigh =
+    if showORB and inRegularSession and !inOpeningRange
+    then openingRangeHigh
+    else orbNa;
+plot ORBLow =
+    if showORB and inRegularSession and !inOpeningRange
+    then openingRangeLow
+    else orbNa;
+ORBHigh.SetDefaultColor(Color.YELLOW);
+ORBLow.SetDefaultColor(Color.YELLOW);
+ORBHigh.SetLineWeight(2);
+ORBLow.SetLineWeight(2);
+ORBHigh.HideBubble();
+ORBLow.HideBubble();
+
+AddLabel(
+    showORBLabel and inRegularSession and close > openingRangeHigh,
+    "Price Above ORB",
+    Color.GREEN,
+    labelLocation,
+    labelSize
+);
+AddLabel(
+    showORBLabel and inRegularSession and close < openingRangeLow,
+    "Price Below ORB",
+    Color.RED,
+    labelLocation,
+    labelSize
+);
+AddLabel(
+    showORBLabel and inRegularSession and
+        close <= openingRangeHigh and close >= openingRangeLow,
+    "Price Inside ORB",
+    Color.YELLOW,
+    labelLocation,
+    labelSize
+);
+
+def lastRealBar = !IsNaN(close) and IsNaN(close[-1]);
+AddChartBubble(
+    showORB and showORBBubbles and lastRealBar,
+    ORBHigh,
+    "ORB HI",
+    Color.YELLOW,
+    yes
+);
+AddChartBubble(
+    showORB and showORBBubbles and lastRealBar,
+    ORBLow,
+    "ORB LO",
+    Color.YELLOW,
+    no
+);
+
+# ----------------------------------------------------------------------
+# ATR: daily, weekly, and monthly volatility context
+# ----------------------------------------------------------------------
+
+input showATRLabel = yes;
+input atrLength = 12;
+input atrAverageType = AverageType.EXPONENTIAL;
+
+def dailyATR = MovingAverage(
+    atrAverageType,
+    TrueRange(
+        Fundamental(FundamentalType.HIGH, period = AggregationPeriod.DAY),
+        Fundamental(FundamentalType.CLOSE, period = AggregationPeriod.DAY),
+        Fundamental(FundamentalType.LOW, period = AggregationPeriod.DAY)
+    ),
+    atrLength
+);
+def weeklyATR = MovingAverage(
+    atrAverageType,
+    TrueRange(
+        Fundamental(FundamentalType.HIGH, period = AggregationPeriod.WEEK),
+        Fundamental(FundamentalType.CLOSE, period = AggregationPeriod.WEEK),
+        Fundamental(FundamentalType.LOW, period = AggregationPeriod.WEEK)
+    ),
+    atrLength
+);
+def monthlyATR = MovingAverage(
+    atrAverageType,
+    TrueRange(
+        Fundamental(FundamentalType.HIGH, period = AggregationPeriod.MONTH),
+        Fundamental(FundamentalType.CLOSE, period = AggregationPeriod.MONTH),
+        Fundamental(FundamentalType.LOW, period = AggregationPeriod.MONTH)
+    ),
+    atrLength
+);
+
+AddLabel(
+    showATRLabel,
+    "ATR(" + atrLength + ") D:" + Round(dailyATR, 1) +
+        " W:" + Round(weeklyATR, 1) +
+        " M:" + Round(monthlyATR, 1),
+    Color.CYAN,
+    labelLocation,
+    labelSize
+);
+
+# ----------------------------------------------------------------------
+# Relative volume: participation
+# A dot appears when volume exceeds the previous average by the selected
+# percentage. A 50% threshold means current volume is at least 1.5x average.
+# ----------------------------------------------------------------------
+
+input showVolumeSpike = yes;
+input volumeAverageLength = 20;
+input volumePercentThreshold = 50;
+
+def averageVolume = Average(volume, volumeAverageLength);
+def volumePercentAboveAverage =
+    if averageVolume[1] != 0
+    then 100 * (volume - averageVolume[1]) / averageVolume[1]
+    else 0;
+def isVolumeSpike =
+    volumePercentAboveAverage >= volumePercentThreshold;
+
+plot VolumeSpike =
+    if showVolumeSpike and isVolumeSpike then HL2 else Double.NaN;
+VolumeSpike.SetPaintingStrategy(PaintingStrategy.POINTS);
+VolumeSpike.SetLineWeight(5);
+VolumeSpike.SetDefaultColor(Color.YELLOW);
+VolumeSpike.HideBubble();
+
+# ----------------------------------------------------------------------
+# ST Momentum Reversal: volatility excursion followed by structural break
+# ----------------------------------------------------------------------
+
+input showMomentumReversal = yes;
+input reversalSignalWindow = 5;
+
+def reversalStandardDeviation = StDev(close, 20);
+def reversalMidline = Average(close, 20);
+def reversalLowerBand =
+    reversalMidline - 2.0 * reversalStandardDeviation;
+def reversalUpperBand =
+    reversalMidline + 2.0 * reversalStandardDeviation;
+
+def barsSinceUpperBand =
+    if high >= reversalUpperBand then 1 else barsSinceUpperBand[1] + 1;
+def barsSinceLowerBand =
+    if low <= reversalLowerBand then 1 else barsSinceLowerBand[1] + 1;
+
+def isTwentyOneBarLow = low == Lowest(low, 21);
+def highOfLowBar =
+    if isTwentyOneBarLow then high else highOfLowBar[1];
+def closesAboveHighOfLowBar =
+    if isTwentyOneBarLow then 0
+    else if close > highOfLowBar
+         then closesAboveHighOfLowBar[1] + 1
+         else closesAboveHighOfLowBar[1];
+def reversalBuy =
+    closesAboveHighOfLowBar == 1 and
+    closesAboveHighOfLowBar[1] == 0 and
+    barsSinceLowerBand <= reversalSignalWindow;
+
+def isTwentyOneBarHigh = high == Highest(high, 21);
+def lowOfHighBar =
+    if isTwentyOneBarHigh then low else lowOfHighBar[1];
+def closesBelowLowOfHighBar =
+    if isTwentyOneBarHigh then 0
+    else if close < lowOfHighBar
+         then closesBelowLowOfHighBar[1] + 1
+         else closesBelowLowOfHighBar[1];
+def reversalSell =
+    closesBelowLowOfHighBar == 1 and
+    closesBelowLowOfHighBar[1] == 0 and
+    barsSinceUpperBand <= reversalSignalWindow;
+
+plot MomentumReversalBuy =
+    showMomentumReversal and reversalBuy;
+MomentumReversalBuy.SetPaintingStrategy(
+    PaintingStrategy.BOOLEAN_ARROW_UP
+);
+MomentumReversalBuy.SetDefaultColor(Color.GREEN);
+MomentumReversalBuy.SetLineWeight(5);
+
+plot MomentumReversalSell =
+    showMomentumReversal and reversalSell;
+MomentumReversalSell.SetPaintingStrategy(
+    PaintingStrategy.BOOLEAN_ARROW_DOWN
+);
+MomentumReversalSell.SetDefaultColor(Color.RED);
+MomentumReversalSell.SetLineWeight(5);
+
+# Hidden plots allow the combined study to be used in scans.
+plot MomentumReversalBuyScan = reversalBuy;
+plot MomentumReversalSellScan = reversalSell;
+MomentumReversalBuyScan.Hide();
+MomentumReversalSellScan.Hide();

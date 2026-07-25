@@ -1,0 +1,265 @@
+#Changed Label position to Bottom Right,deleted lines, alerts and arrows to show only the visual labels by C. Ricks 5/1/26.
+
+plot ma9 = ExpAverage(close, 9);
+
+
+plot ma18 = ExpAverage(close, 18);
+
+plot ma34 = ExpAverage(close, 34);
+
+plot ma89 = ExpAverage(close, 89);
+
+
+#MOMENTUM .........................................................................
+
+input UseChartTimeframe = {default "Yes", "No"};
+input CustomAggregation = AggregationPeriod.Five_MIN;
+
+
+
+input lookback = 20;
+input RofSmooth = 3;
+input BiasType = "wma";
+input BiasLength = 30;
+
+def c;
+def h;
+def l;
+def o;
+def vol;
+switch (UseChartTimeframe) {
+case "Yes" :
+c = close;
+h = high;
+l = low;
+o = open;
+vol = volume;
+case "No" :
+c = close(Period = CustomAggregation);
+h = high(Period = CustomAggregation);
+l = low(Period = CustomAggregation);
+o = open(Period = CustomAggregation);
+vol = volume(Period = CustomAggregation);
+}
+
+#// --- Functions
+#GetAverage(_data, _len, MAOption) =>
+script GetAverage {
+input _data = close;
+input _len = 10;
+input MAOption = "EMA";
+def mav = ((Average(_data, _len)[1] * (_len - 1)) + _data) / _len;
+def GetAverage = if MAOption == "SMA" then Average(_data, _len) else
+if MAOption == "EMA" then ExpAverage(_data, _len) else
+if MAOption == "MAV" then mav else
+if MAOption == "HMA" then HullMovingAvg(_data, _len) else
+if MAOption == "RMA" then WildersAverage(_data, _len) else
+if MAOption == "WMA" then WMA(_data, _len) else Average(_data, _len);
+plot out = GetAverage;
+}
+#Normalize(_Value, _Avg) =>
+script Normalize {
+input _Value = close;
+input _Avg = 10;
+def _X = _Value / _Avg;
+def _Nor =
+if _X > 1.50 then 1.00 else
+if _X > 1.20 then 0.90 else
+if _X > 1.00 then 0.80 else
+if _X > 0.80 then 0.70 else
+if _X > 0.60 then 0.60 else
+if _X > 0.40 then 0.50 else
+if _X > 0.20 then 0.25 else 0.1;
+plot norm = _Nor;
+}
+#// Calculations
+def v = if IsNaN(vol) then 1 else vol;
+def volSMA = Average(v, lookback);
+def Vola = volSMA;
+
+def Vola_n_pre = Normalize(v, Vola) * 100;
+
+def Vola_n = Vola_n_pre;
+
+def BarSpread = (c - o);
+def hl = (h - l);
+def BarRange = if hl == 0 then BarRange[1] else hl;
+def hhll = Highest(h, 2) - Lowest(l, 2);
+def R2 = if hhll == 0 then R2[1] else hhll;
+def SrcShift = c - c[1];
+#//TR = ta.tr(true)
+
+def sign_shift = Sign(SrcShift);
+def sign_spread = Sign(BarSpread);
+#// in-bar assessments
+def dif = (c - l);#if (c - l)==0 then dif[1] else (c - l);
+def barclosing = 2 * dif / BarRange * 100 - 100;
+def s2r = BarSpread / BarRange * 100;
+
+def BarSpread_abs = AbsValue(BarSpread);
+def barSMA = Average(BarSpread_abs, lookback);
+def BarSpread_avg = barSMA;
+
+def BarSpread_ratio_n = Normalize(BarSpread_abs, BarSpread_avg) * 100 * sign_spread ;
+
+#// 2-bar assessments
+def cl = c - Lowest(l, 2);
+def barclosing_2 = 2 * cl / R2 * 100 - 100;
+def Shift2Bar_toR2 = SrcShift / R2 * 100;
+#// 6. Calculate 2-bar Relative Shift
+def SrcShift_abs = AbsValue(SrcShift);
+def srcSMA = Average(SrcShift_abs, lookback);
+def srcshift_avg = srcSMA;
+
+def srcshift_ratio_n = Normalize(SrcShift_abs, srcshift_avg) * 100 * sign_shift;
+#/ Relative Price Strength combining all strength elements
+def Pricea_n = (barclosing + s2r + BarSpread_ratio_n + barclosing_2 + Shift2Bar_toR2 + srcshift_ratio_n) / 6;
+# "Price Normalized"
+#//Let's take Bar Flow as the combined price strength * the volume:avg ratio
+def bar_flow = Pricea_n * Vola_n / 100;
+#/ Relative Price Strength combining all strength elements
+def bulls = Max(bar_flow, 0);
+def bears = -1 * Min(bar_flow, 0);
+
+#// Calculate Bias / sentiment on longer length
+def bulls_bia = GetAverage(bulls, BiasLength, BiasType);
+def bears_bia = GetAverage(bears, BiasLength, BiasType);
+def dx_b = bulls_bia / bears_bia;
+def RROF_b = 2 * (100 - 100 / (1 + dx_b)) - 100;
+def RROF_bs = WMA(RROF_b, RofSmooth);
+#// Colors & plots
+def s_up = RROF_bs >= 0;
+
+
+
+#-- Bar Color
+def c_vol = bar_flow > 0;
+def ExtUp = s_up and c_vol;
+def ExtDn = !s_up and !c_vol;
+
+#-- 3MA Signal
+def LONG = if ExtUp or !s_up and !ExtDn then 1 else 0;
+
+AddLabel(yes, "MOMENTUM  " , if LONG then Color.GREEN else Color.RED, location = Location.Bottom_Right, size = FontSize.SMALL, "row ownership" = yes);
+
+
+#TREND............................................................................................
+
+declare real_size;
+
+input ghlaPeriod = 10;
+input stPeriod = 14;
+input stShiftTicks = 20.0;
+
+def minTick = TickSize();
+def shift = stShiftTicks * minTick;
+
+# -----------------------------
+# GHLA Logic
+# -----------------------------
+def ghlaAvgH = Average(high, ghlaPeriod);
+def ghlaAvgL = Average(low, ghlaPeriod);
+
+def sw = if close > ghlaAvgH then 1
+else if close < ghlaAvgL then -1
+else 0;
+
+def ghlaDir = CompoundValue(1, if sw != 0 then sw else ghlaDir[1], 0);
+def ghlaLevel = if ghlaDir < 0 then ghlaAvgH else ghlaAvgL;
+
+# -----------------------------
+# Custom CCI using Typical Price
+# -----------------------------
+def tp = (high + low + close) / 3;
+def tpSMA = Average(tp, stPeriod);
+def meanDev = Average(AbsValue(tp - tpSMA), stPeriod);
+def cciValue = if meanDev == 0 then 0 else (tp - tpSMA) / (0.015 * meanDev);
+
+# -----------------------------
+# SuperTrend State Machine
+# -----------------------------
+
+# stFlag: 1=long, -1=short
+rec stFlag = if IsNaN(stFlag[1]) then if cciValue >= 0 then 1 else -1
+else if cciValue > 0 and stFlag[1] <= 0 then 1
+else if cciValue < 0 and stFlag[1] >= 0 then -1
+else stFlag[1];
+
+rec st = if IsNaN(st[1]) then if cciValue >= 0 then low - shift else high + shift
+else
+if cciValue > 0 and stFlag[1] <= 0 then low - shift
+else if cciValue < 0 and stFlag[1] >= 0 then high + shift
+else
+if stFlag > 0 and (low - shift) > st[1] then low - shift
+else if stFlag < 0 and (high + shift) < st[1] then high + shift
+else st[1];
+
+# -----------------------------
+# signals
+# -----------------------------
+def notNaST = !IsNaN(st);
+def upSignal = notNaST and close > st and close > ghlaLevel;
+def downSignal = notNaST and close < st and close < ghlaLevel;
+
+
+AddLabel(yes, "TREND     " , if upSignal then Color.GREEN else if downSignal then Color.RED else CreateColor(255, 255, 0) , location = Location.Bottom_Right, size = FontSize.SMALL, "row ownership" = yes);
+
+
+# PRICE VS MA9 AND MA18 ............................................................................
+
+
+def BEAR_5algo2 = if close < ma18 and close < ma9 then 1 else 0;
+def BULL_5algo2 = if close > ma18 and close > ma9 then 1 else 0;
+
+#SIGNAL ------------------------------------------------------------------------------
+
+#plot BEAR_CORRELATION = if !BEAR_5algo2 and !BULL_5algo2 then 1 else 0;
+
+AddLabel(yes, "PRICE VS 9 18 " , if BULL_5algo2 then Color.GREEN else if BEAR_5algo2 then Color.RED else CreateColor(255, 255, 0) , location = Location.Bottom_Right, size = FontSize.SMALL, "row ownership" = yes);
+
+#MA DIRECTIONAL..................................................................................
+
+def BEAR_DIR = if ma9 < ma9[1] then 1 else 0;
+def BULL_DIR = if ma9 > ma9[1] then 1 else 0;
+
+AddLabel(yes, "MA9 ANGLE " , if BULL_DIR then Color.GREEN else Color.RED , location = Location.Bottom_Right, size = FontSize.SMALL, "row ownership" = yes);
+
+
+# MACD .....................................................................................
+
+input fastLength = 5;
+input slowLength = 13;
+input MACDLength = 8;
+input averageType = AverageType.EXPONENTIAL;
+
+def Value = MovingAverage(averageType, close, fastLength) - MovingAverage(averageType, close, slowLength);
+
+def Avg = MovingAverage(averageType, Value, MACDLength);
+
+#-- Color Change Signal
+def BULL_color = if Value > Avg then 1 else 0;
+def BEAR_color = if Value < Avg then 1 else 0;
+
+#AddVerticalLine(BULL_color , "", Color.green, Curve.FIRM);
+#AddVerticalLine(BEAR_color , "", Color.red, Curve.FIRM);
+
+AddLabel(yes, "MACD      " , if BULL_color then Color.GREEN else Color.RED , location = Location.Bottom_Right, size = FontSize.SMALL, "row ownership" = yes);
+
+def BULL_ANGLE = if Value > Value[1] then 1 else 0;
+def BEAR_ANGLE = if Value < Value[1] then 1 else 0;
+
+AddLabel(yes, "MACD ANGLE " , if BULL_ANGLE then Color.GREEN else Color.RED , location = Location.Bottom_Right, size = FontSize.SMALL, "row ownership" = yes);
+
+
+# RADAR ..................................................................................
+def A_PLUS_BULL1 = if upSignal and BULL_5algo2 and BULL_DIR and BULL_color and BULL_ANGLE then 1 else 0;
+def A_PLUS_BEAR1 = if downSignal and BEAR_5algo2 and BEAR_DIR and BEAR_color and BEAR_ANGLE then 1 else 0;
+
+plot BULL_color1 = if A_PLUS_BULL1 then close else 0;
+BULL_color1.AssignValueColor(Color.Green);
+
+
+plot BEAR_color1 = if A_PLUS_BEAR1 then close else 0;
+BEAR_color1.AssignValueColor(Color.RED);
+
+AssignPriceColor( if BULL_color1 then Color.GREEN else if BEAR_color1 then Color.RED else Color.Yellow );

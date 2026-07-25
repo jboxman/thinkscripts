@@ -1,0 +1,52 @@
+## PolynomialQuadraticMA_JQ
+## v01.10.2021 version 01 dated October 2021
+## based on
+## Polynomial Quadratic Moving Average
+## Mobius
+## V01.09.2021
+## JQ adulterations;
+## the Y from close to (close + vwap)/2
+## added a label identifying Y and n
+##
+## use with SingleBar VWAP to visualize the single bar VWAP
+## mobius' comments and header
+#15:33 Mobius: Bored so fooling around with close to zero lag moving averages again.
+# Polynomial Quadratic Moving Average
+# Mobius
+# V01.09.2021
+
+input n = 20; # mobius default was 20
+script E
+{
+input y = 1;
+input n = 10;
+def t = fold i = 0 to n
+with s
+do s + getValue(y, i);
+plot output = t;
+}
+def y = (close + VWAP )/2; #mobius y = close
+def x = compoundValue(1, x[1] + 1, 1);
+
+def Ex = E(x, n);
+def Ey = E(y, n);
+def Ex2 = E(sqr(x), n);
+def Ex3 = E(power(x, 3), n);
+def Ex4 = E(power(x, 4), n);
+def Exy = E(x*y, n);
+def Ex2y = E(sqr(x)*Y, n);
+def Exx = Ex2 - (sqr(Ex)/n);
+def Ex_y = Exy - ((Ex * Ey)/n);
+def Exx2 = Ex3 - ((Ex2 * Ex)/n);
+def Ex2_y = Ex2y - ((Ex2 * Ey)/n);
+def Ex2x2 = Ex4 - (sqr(Ex2)/n);
+
+def a = ((Ex2_y * Exx) - (Ex_y * Exx2)) / ((Exx * Ex2x2) - sqr(Exx2));
+def b = ((Ex_y * Ex2x2) - (Ex2_y * Exx2)) / ((Exx * Ex2x2) - Sqr(Exx2));
+def c = (Ey / n) - (b * (Ex / n)) - (a * (Ex2 / n));
+
+plot poly = (a*sqr(x)) + (b*x) + c;
+
+
+
+# End Code Polynomial Quadratic Moving Average

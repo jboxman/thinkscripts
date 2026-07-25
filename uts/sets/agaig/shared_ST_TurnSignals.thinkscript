@@ -1,0 +1,19 @@
+# ST_TurnSignals
+# 08/21/23
+# Eric Purdy
+
+def rDown = TTM_Squeeze() > 0 and TTM_Squeeze() < TTM_Squeeze()[1] and TTM_Squeeze()[2] < TTM_Squeeze()[1];
+def rUp = TTM_Squeeze() < 0 and TTM_Squeeze() > TTM_Squeeze()[1] and TTM_Squeeze()[2] > TTM_Squeeze()[1];
+
+plot TurnDown = rDown;
+TurnDown.SetPaintingStrategy(paintingStrategy.BOOLEAN_ARROW_DOWN);
+TurnDown.setDefaultColor(color.cyan);
+TurnDown.setLineWeight(3);
+
+plot TurnUp = rUp;
+TurnUp.SetPaintingStrategy(paintingStrategy.BOOLEAN_ARROW_UP);
+TurnUp.setDefaultColor(color.yellow);
+TurnUp.setLineWeight(3);
+
+Alert(rDown, "Turn Down", alert.bar, sound.NoSound);
+Alert(rUp, "Turn Up", alert.bar, sound.NoSound);

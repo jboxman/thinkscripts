@@ -1,0 +1,16 @@
+declare upper;
+
+input PriceMarker = yes; #Hint PriceMarker: Shows a line pointing to the current price level.
+
+def closeplot = if !IsNaN(close) and IsNaN(close[-1]) then close else closeplot[1];
+plot pricepointer = if PriceMarker and IsNaN(close)  then closeplot else Double.NaN;
+pricepointer.SetDefaultColor(Color.CYAN);
+pricepointer.SetLineWeight(3);
+
+def static = pricepointer;
+
+input bubblemover = 2;
+def   b = bubblemover;
+def limit = !IsNaN(close[b+1]) and IsNaN(close [b] );# && HighestAll(BarNumber());
+
+AddChartBubble(limit, static[b], "Price Pointer", Color.Cyan);

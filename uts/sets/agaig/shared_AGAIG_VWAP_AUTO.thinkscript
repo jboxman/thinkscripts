@@ -1,0 +1,14 @@
+# Indicator for TOS
+#study(title="Buy/Sell by Prakash EEE", overlay=true)
+# Converted by Sam4Cok@Samer800    - 07/2024
+#Revamped by C. Ricks to show VWAP only 5/3024
+input showVwapLine = yes;
+input vwapTimeFrame = {default DAY, WEEK, MONTH};
+
+def na = Double.NaN;
+def wap = Reference vwap(timeFrame = vwapTimeFrame).price;
+
+plot vwapLine = if showVwapLine then wap else na;
+vwapLine.SetDefaultColor(Color.Yellow);
+
+#-- END of CODE

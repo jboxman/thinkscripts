@@ -1,0 +1,10 @@
+##AsGood_CandleVolumeStrength 1/3/23
+input volAvgL = 20;
+input volPctThreshold = 50;
+def avgVol = Average(volume, volAvgL);
+def pctVol = 100 * ((volume - avgVol[1]) /avgVol[1]);
+def pctDot = pctVol >= volpctThreshold;
+plot volSt = if pctDot then hl2 else Double.NaN;
+volSt.SetPaintingStrategy(PaintingStrategy.POINTS);
+volSt.SetLineWeight(5);
+volSt.SetDefaultColor(createcolor(255,255,0));
