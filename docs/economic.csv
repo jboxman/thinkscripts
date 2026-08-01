@@ -1,0 +1,12 @@
+﻿Watchlist 'Economic Indicators'
+
+Economic Indicators
+Symbol,Description,Mark,Mark %Change,RS50
+GDP:FRED,Gross Domestic Product,31865.721,<empty>,NaN
+CPIAUCSL:FRED,Consumer Price Index for All Urban Consumers: All Items in U.S. City Average,332.568,<empty>,loading
+INDPRO:FRED,Industrial Production: Total Index,102.640,<empty>,loading
+UNRATE:FRED,Unemployment Rate,4.200,<empty>,loading
+PAYEMS:FRED,"All Employees, Total Nonfarm",158984.000,<empty>,loading
+IC4WSA:FRED,4-Week Moving Average of Initial Claims,207500.000,<empty>,loading
+FEDFUNDS:FRED,Federal Funds Effective Rate,3.630,<empty>,loading
+MORTGAGE30US:FRED,30-Year Fixed Rate Mortgage Average in the United States,6.580,<empty>,loading

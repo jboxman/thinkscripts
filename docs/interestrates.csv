@@ -1,0 +1,15 @@
+﻿Watchlist 'Interest Rates'
+
+Interest Rates
+Symbol,Description,Mark,Mark %Change,RS50
+DGS30:FRED,"Market Yield on U.S. Treasury Securities at 30-Year Constant Maturity, Quoted on an Investment Basis",5.170,<empty>,loading
+DGS20:FRED,"Market Yield on U.S. Treasury Securities at 20-Year Constant Maturity, Quoted on an Investment Basis",5.200,<empty>,loading
+DGS10:FRED,"Market Yield on U.S. Treasury Securities at 10-Year Constant Maturity, Quoted on an Investment Basis",4.710,<empty>,loading
+DGS7:FRED,"Market Yield on U.S. Treasury Securities at 7-Year Constant Maturity, Quoted on an Investment Basis",4.580,<empty>,loading
+DGS5:FRED,"Market Yield on U.S. Treasury Securities at 5-Year Constant Maturity, Quoted on an Investment Basis",4.460,<empty>,loading
+DGS3:FRED,"Market Yield on U.S. Treasury Securities at 3-Year Constant Maturity, Quoted on an Investment Basis",4.400,<empty>,loading
+DGS2:FRED,"Market Yield on U.S. Treasury Securities at 2-Year Constant Maturity, Quoted on an Investment Basis",4.370,<empty>,loading
+DGS1:FRED,"Market Yield on U.S. Treasury Securities at 1-Year Constant Maturity, Quoted on an Investment Basis",4.150,<empty>,loading
+DGS6MO:FRED,"Market Yield on U.S. Treasury Securities at 6-Month Constant Maturity, Quoted on an Investment Basis",4.090,<empty>,loading
+DGS3MO:FRED,"Market Yield on U.S. Treasury Securities at 3-Month Constant Maturity, Quoted on an Investment Basis",3.950,<empty>,loading
+DGS1MO:FRED,"Market Yield on U.S. Treasury Securities at 1-Month Constant Maturity, Quoted on an Investment Basis",3.820,<empty>,loading

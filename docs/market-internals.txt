@@ -1,0 +1,330 @@
+# https://tlc.thinkorswim.com/center/release/rel-07-20-2013 | < 404 >
+# Technical Notes
+# We have added a huge number of new technical indicators.
+# Here are all of the details:
+# The New York Stock Exchange (NYSE) is a physical and electronic stock exchange, while NYSE Arca is an electronic communications network (ECN) used for matching orders.
+# Definitions
+# Composite Markets - traded anywhere
+# Primary Markets – AMEX, ARCA, NASDAQ, NYSE
+# Advancing issues – Issues that have a positive net change from previous "trading day’s close" (?)
+# Declining issues – Issues that have a negative net change from previous "trading day’s close" (?)
+# $TICK – Number of issues that have a positive change from previous trade minus number of issues that have a negative change from previous trade
+# $TRIN – Volume of advancing issues divided by the volume of declining issues
+#=======================================================================================================
+
+# All USA stocks: Primary Markets only
+# $ADUSD  AllUSA Advancing Issues - Declining Issues Difference
+# $ADVUS  AllUSA Advanced issues
+# $DECLUS AllUSA Declined issues
+# $DVOLUS AllUSA Declined volume
+# $TIKUS  AllUSA TICK
+# $TRINUS AllUSA TRIN
+# $TVOLUS AllUSA Total volume
+# $UNCHUS AllUSA Unchanged issues
+# $UVOLUS AllUSA Advanced volume
+# $VOLUSD AllUSA Up Volume - Down Volume Difference
+
+# All USA stocks: All Markets
+# $ADUSDC  AllUSA Composite Advancing Issues - Declining Issues Difference
+# $ADVUSC  AllUSA Composite Advanced issues
+# $DECLUSC AllUSA Composite Declined issues
+# $DVOLUSC AllUSA Composite Declined volume
+# $TIKUSC  AllUSA Composite TICK
+# $TRINUSC AllUSA Composite TRIN
+# $TVOLUSC AllUSA Composite Total volume
+# $UNCHUSC AllUSA Composite Unchanged issues
+# $UVOLUSC AllUSA Composite Advanced volume
+# $VOLUSDC AllUSA Composite Up Volume - Down Volume Difference
+
+# AMEX listed: Primary Markets only
+# $ADAD  NYSE MKT (AMEX) Advancing Issues - Declining Issues Difference
+# $ADVA  NYSE MKT (AMEX) Advanced issues
+# $DECA  NYSE MKT (AMEX) Declined issues
+# $DVOA  NYSE MKT (AMEX) Declined volume
+# $TICKA NYSE MKT (AMEX) TICK
+# $TRINA NYSE MKT (AMEX) TRIN
+# $TVOA  NYSE MKT (AMEX) Total volume
+# $UNCA  NYSE MKT (AMEX) Unchanged issues
+# $UVOA  NYSE MKT (AMEX) Advanced volume
+# $VOLAD NYSE MKT (AMEX) Up Volume - Down Volume Difference
+
+# AMEX listed: All Markets
+# $ADADC  NYSE MKT (AMEX) Composite Advancing Issues - Declining Issues Difference
+# $ADVAC  NYSE MKT (AMEX) Composite Advanced issues
+# $DECAC  NYSE MKT (AMEX) Composite Declined issues
+# $DVOAC  NYSE MKT (AMEX) Composite Declined volume
+# $TICKAC NYSE MKT (AMEX) Composite TICK
+# $TRINAC NYSE MKT (AMEX) Composite TRIN
+# $TVOAC  NYSE MKT (AMEX) Composite Total volume
+# $UNCAC  NYSE MKT (AMEX) Composite Unchanged issues
+# $UVOAC  NYSE MKT (AMEX) Composite Advanced volume
+# $VOLADC NYSE MKT (AMEX) Composite Up Volume - Down Volume Difference
+
+# DJIA components: Primary Markets only
+# $ADID  DJIA Advancing Issues - Declining Issues Difference
+# $ADVI  DJIA Advanced issues
+# $DECLI DJIA Declined issues
+# $DVOLI DJIA Declined volume
+# $TIKI  DJIA TICK
+# $TRINI DJIA TRIN
+# $TVOLI DJIA Total volume
+# $UNCHI DJIA Unchanged issues
+# $UVOLI DJIA Advanced volume
+# $VOLID DJIA Up Volume - Down Volume Difference
+
+# DJIA components: All Markets
+# $ADIDC  DJIA Composite Advancing Issues - Declining Issues Difference
+# $ADVIC  DJIA Composite Advanced issues
+# $DECLIC DJIA Composite Declined issues
+# $DVOLIC DJIA Composite Declined volume
+# $TIKIC  DJIA Composite TICK
+# $TRINIC DJIA Composite TRIN
+# $TVOLIC DJIA Composite Total volume
+# $UNCHIC DJIA Composite Unchanged issues
+# $UVOLIC DJIA Composite Advanced volume
+# $VOLIDC DJIA Composite Up Volume - Down Volume Difference
+
+# NASDAQ listed: Primary Markets only
+# $ADQD   NASDAQ Advancing Issues - Declining Issues Difference
+# $ADVN/Q NASDAQ Advanced issues
+# $DECN/Q NASDAQ Declined issues
+# $DVOL/Q NASDAQ Declined volume
+# $TICK/Q NASDAQ TICK
+# $TRIN/Q NASDAQ TRIN
+# $TVOL/Q NASDAQ Total volume
+# $UNCN/Q NASDAQ Unchanged issues
+# $UVOL/Q NASDAQ Advanced volume
+# $VOLQD  NASDAQ Up Volume - Down Volume Difference
+
+# NASDAQ listed: All Markets
+# $ADQDC   NASDAQ Composite Advancing Issues - Declining Issues Difference
+# $ADVNC/Q NASDAQ Composite Advanced issues
+# $DECNC/Q NASDAQ Composite Declined issues
+# $DVOLC/Q NASDAQ Composite Declined volume
+# $TICKC/Q NASDAQ Composite TICK
+# $TRINC/Q NASDAQ Composite TRIN
+# $TVOLC/Q NASDAQ Composite Total volume
+# $UNCNC/Q NASDAQ Composite Unchanged issues
+# $UVOLC/Q NASDAQ Composite Advanced volume
+# $VOLQDC  NASDAQ Composite Up Volume - Down Volume Difference
+
+# NASDAQ 100 components: Primary Markets only
+# $ADNDD  NASDAQ 100 Advancing Issues - Declining Issues Difference
+# $ADVND  NASDAQ 100 Advanced issues
+# $DECLND NASDAQ 100 Declined issues
+# $DVOLND NASDAQ 100 Declined volume
+# $TIKND  NASDAQ 100 TICK
+# $TRINND NASDAQ 100 TRIN
+# $TVOLND NASDAQ 100 Total volume
+# $UNCHND NASDAQ 100 Unchanged issues
+# $UVOLND NASDAQ 100 Advanced volume
+# $VOLNDD NASDAQ 100 Up Volume - Down Volume Difference
+
+# NASDAQ 100 components: All Markets
+# $ADNDDC  NASDAQ 100 Composite Advancing Issues - Declining Issues Difference
+# $ADVNDC  NASDAQ 100 Composite Advanced issues
+# $DECLNDC NASDAQ 100 Composite Declined issues
+# $DVOLNDC NASDAQ 100 Composite Declined volume
+# $TIKNDC  NASDAQ 100 Composite TICK
+# $TRINNDC NASDAQ 100 Composite TRIN
+# $TVOLNDC NASDAQ 100 Composite Total volume
+# $UNCHNDC NASDAQ 100 Composite Unchanged issues
+# $UVOLNDC NASDAQ 100 Composite Advanced volume
+# $VOLNDDC NASDAQ 100 Composite Up Volume - Down Volume Difference
+
+# NYSE listed: listed on NYSE trades only on NYSE
+# $ADD  NYSE Advancing Issues - Declining Issues Difference
+# $ADVN NYSE Advanced issues
+# $DECN NYSE Declined issues
+# $DVOL NYSE Declined volume
+# $TICK NYSE TICK
+# $TRIN NYSE TRIN
+# $TVOL NYSE Total volume
+# $UNCN NYSE Unchanged issues
+# $UVOL NYSE Advanced volume
+# $VOLD NYSE Up Volume - Down Volume Difference
+
+# NYSE listed: Listed on NYSE traded anywhere
+# $ADDC  NYSE Composite Advancing Issues - Declining Issues Difference
+# $ADVNC NYSE Composite Advanced issues
+# $DECNC NYSE Composite Declined issues
+# $DVOLC NYSE Composite Declined volume
+# $TICKC NYSE Composite TICK
+# $TRINC NYSE Composite TRIN
+# $TVOLC NYSE Composite Total volume
+# $UNCNC NYSE Composite Unchanged issues
+# $UVOLC NYSE Composite Advanced volume
+# $VOLDC NYSE Composite Up Volume - Down Volume Difference
+
+# NYSE ARCA listed: Primary Markets only
+# $ADARD  NYSE ARCA Advancing Issues - Declining Issues Difference
+# $ADVAR  NYSE ARCA Advanced issues
+# $DECAR  NYSE ARCA Declined issues
+# $DVOAR  NYSE ARCA Declined volume
+# $TICKAR NYSE ARCA TICK
+# $TRINAR NYSE ARCA TRIN
+# $TVOAR  NYSE ARCA Total volume
+# $UNCAR  NYSE ARCA Unchanged issues
+# $UVOAR  NYSE ARCA Advanced volume
+# $VOLARD NYSE ARCA Up Volume - Down Volume Difference
+
+# NYSE ARCA listed: All Markets
+# $ADARDC  NYSE ARCA Composite Advancing Issues - Declining Issues Difference
+# $ADVARC  NYSE ARCA Composite Advanced issues
+# $DECARC  NYSE ARCA Composite Declined issues
+# $DVOARC  NYSE ARCA Composite Declined volume
+# $TICKARC NYSE ARCA Composite TICK
+# $TRINARC NYSE ARCA Composite TRIN
+# $TVOARC  NYSE ARCA Composite Total volume
+# $UNCARC  NYSE ARCA Composite Unchanged issues
+# $UVOARC  NYSE ARCA Composite Advanced volume
+# $VOLARDC NYSE ARCA Composite Up Volume - Down Volume Difference
+
+# The New York Stock Exchange (NYSE) is a physical and electronic stock exchange, while NYSE Arca is an electronic communications network (ECN) used for matching orders.
+
+# RUSSELL 2000 components: Primary Markets only
+# $ADRLD  RUSSELL 2000 Advancing Issues - Declining Issues Difference
+# $ADVRL  RUSSELL 2000 Advanced issues
+# $DECLRL RUSSELL 2000 Declined issues
+# $DVOLRL RUSSELL 2000 Declined volume
+# $TIKRL  RUSSELL 2000 TICK
+# $TRINRL RUSSELL 2000 TRIN
+# $TVOLRL RUSSELL 2000 Total volume
+# $UNCHRL RUSSELL 2000 Unchanged issues
+# $UVOLRL RUSSELL 2000 Advanced volume
+# $VOLRLD RUSSELL 2000 Up Volume - Down Volume Difference
+ 
+# RUSSELL 2000 components: All Markets
+# $ADRLDC  RUSSELL 2000 Composite Advancing Issues - Declining Issues Difference
+# $ADVRLC  RUSSELL 2000 Composite Advanced issues
+# $DECLRLC RUSSELL 2000 Composite Declined issues
+# $DVOLRLC RUSSELL 2000 Composite Declined volume
+# $TIKRLC  RUSSELL 2000 Composite TICK
+# $TRINRLC RUSSELL 2000 Composite TRIN
+# $TVOLRLC RUSSELL 2000 Composite Total volume
+# $UNCHRLC RUSSELL 2000 Composite Unchanged issues
+# $UVOLRLC RUSSELL 2000 Composite Advanced volume
+# $VOLRLDC RUSSELL 2000 Composite Up Volume - Down Volume Difference
+
+# S&P 500 components: Primary Markets only
+# $ADSPD  SNP 500 Advancing Issues - Declining Issues Difference
+# $ADVSP  SNP 500 Advanced issues
+# $DECLSP SNP 500 Declined issues
+# $DVOLSP SNP 500 Declined volume
+# $TIKSP  SNP 500 TICK
+# $TRINSP SNP 500 TRIN
+# $TVOLSP SNP 500 Total volume
+# $UNCHSP SNP 500 Unchanged issues
+# $UVOLSP SNP 500 Advanced volume
+# $VOLSPD SNP 500 Up Volume - Down Volume Difference
+
+# S&P 500 components: All Markets
+# $ADSPDC  SNP 500 Composite Advancing Issues - Declining Issues Difference
+# $ADVSPC  SNP 500 Composite Advanced issues
+# $DECLSPC SNP 500 Composite Declined issues
+# $DVOLSPC SNP 500 Composite Declined volume
+# $TIKSPC  SNP 500 Composite TICK
+# $TRINSPC SNP 500 Composite TRIN
+# $TVOLSPC SNP 500 Composite Total volume
+# $UNCHSPC SNP 500 Composite Unchanged issues
+# $UVOLSPC SNP 500 Composite Advanced volume
+# $VOLSPDC SNP 500 Composite Up Volume - Down Volume Difference
+
+# AMEX New Highs/Lows
+# $AMHI1W NYSE MKT (AMEX) New Highs 1W
+# $AMHI2W NYSE MKT (AMEX) New Highs 2W
+# $AMHI1M NYSE MKT (AMEX) New Highs 1M
+# $AMHI3M NYSE MKT (AMEX) New Highs 3M
+# $AMHI6M NYSE MKT (AMEX) New Highs 6M
+# $AMHI9M NYSE MKT (AMEX) New Highs 9M
+# $AMHGH  NYSE MKT (AMEX) New Highs 1Y
+# $AMLO1W NYSE MKT (AMEX) New Lows  1W
+# $AMLO2W NYSE MKT (AMEX) New Lows  2W
+# $AMLO1M NYSE MKT (AMEX) New Lows  1M
+# $AMLO3M NYSE MKT (AMEX) New Lows  3M
+# $AMLO6M NYSE MKT (AMEX) New Lows  6M
+# $AMLO9M NYSE MKT (AMEX) New Lows  9M
+# $AMLOW  NYSE MKT (AMEX) New Lows  1Y
+
+# NASDAQ New Highs/Lows
+# $NAHI1W NASDAQ New Highs 1W
+# $NAHI2W NASDAQ New Highs 2W
+# $NAHI1M NASDAQ New Highs 1M
+# $NAHI3M NASDAQ New Highs 3M
+# $NAHI6M NASDAQ New Highs 6M
+# $NAHI9M NASDAQ New Highs 9M
+# $NAHGH  NASDAQ New Highs 1Y
+# $NALO1W NASDAQ New Lows  1W
+# $NALO2W NASDAQ New Lows  2W
+# $NALO1M NASDAQ New Lows  1M
+# $NALO3M NASDAQ New Lows  3M
+# $NALO6M NASDAQ New Lows  6M
+# $NALO9M NASDAQ New Lows  9M
+# $NALOW  NASDAQ New Lows  1Y
+
+# NYSE New Highs/Lows
+# $NYHI1W NYSE New Highs 1W
+# $NYHI2W NYSE New Highs 2W
+# $NYHI1M NYSE New Highs 1M
+# $NYHI3M NYSE New Highs 3M
+# $NYHI6M NYSE New Highs 6M
+# $NYHI9M NYSE New Highs 9M
+# $NYHGH  NYSE New Highs 1Y
+# $NYLO1W NYSE New Lows  1W
+# $NYLO2W NYSE New Lows  2W
+# $NYLO1M NYSE New Lows  1M
+# $NYLO3M NYSE New Lows  3M
+# $NYLO6M NYSE New Lows  6M
+# $NYLO9M NYSE New Lows  9M
+# $NYLOW  NYSE New Lows  1Y
+
+# NYSE ARCA New Highs/Lows
+# $ARHI1W NYSE ARCA New Highs 1W
+# $ARHI2W NYSE ARCA New Highs 2W
+# $ARHI1M NYSE ARCA New Highs 1M
+# $ARHI3M NYSE ARCA New Highs 3M
+# $ARHI6M NYSE ARCA New Highs 6M
+# $ARHI9M NYSE ARCA New Highs 9M
+# $ARHGH  NYSE ARCA New Highs 1Y
+# $ARLO1W NYSE ARCA New Lows  1W
+# $ARLO2W NYSE ARCA New Lows  2W
+# $ARLO1M NYSE ARCA New Lows  1M
+# $ARLO3M NYSE ARCA New Lows  3M
+# $ARLO6M NYSE ARCA New Lows  6M
+# $ARLO9M NYSE ARCA New Lows  9M
+# $ARLOW  NYSE ARCA New Lows  1Y
+
+# AMEX/ARCA/NASDAQ/NYSE ETFs New Highs/Lows
+# $ETFHI1W ETF New Highs 1W
+# $ETFHI2W ETF New Highs 2W
+# $ETFHI1M ETF New Highs 1M
+# $ETFHI3M ETF New Highs 3M
+# $ETFHI6M ETF New Highs 6M
+# $ETFHI9M ETF New Highs 9M
+# $ETFHGH  ETF New Highs 1Y
+# $ETFLO1W ETF New Lows  1W
+# $ETFLO2W ETF New Lows  2W
+# $ETFLO1M ETF New Lows  1M
+# $ETFLO3M ETF New Lows  3M
+# $ETFLO6M ETF New Lows  6M
+# $ETFLO9M ETF New Lows  9M
+# $ETFLOW  ETF New Lows  1Y
+
+# OCC Put/Call Ratios
+# $PCALL Put/Call ratio for all OCC options
+# $PCI   Put/Call ratio for all DJIA constituent options
+# $PCRL  Put/Call ratio for all Russell 2000 constituent options
+# $PCSP  Put/Call ratio for all S&P 500 constituent options
+# $PCND  Put/Call ratio for all NASDAQ 100 constituent options
+
+# S&P 500 Percent of Stocks Above Moving Average
+# $SPXA50R  Percent of S&P 500 stocks above their 50-day simple moving average
+# $SPXA100R Percent of S&P 500 stocks above their 100-day simple moving average
+# $SPXA200R Percent of S&P 500 stocks above their 200-day simple moving average
+ 
+# Definitions
+# Primary Markets – AMEX, ARCA, NASDAQ, NYSE
+# Advancing issues – Issues that have a positive net change from previous trading day’s close
+# Declining issues – Issues that have a negative net change from previous trading day’s close
+# $TICK – Number of issues that have a positive change from previous trade minus number of issues that have a negative change from previous trade
+# $TRIN – Volume of advancing issues divided by the volume of declining issues

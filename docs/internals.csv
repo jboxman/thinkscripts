@@ -1,0 +1,258 @@
+﻿Watchlist 'Internals & Indicators'
+
+Internals & Indicators
+Symbol,Description,Mark,Mark %Change,RS50
+$ADD,NYSE Advancing Issues - Declining Issues Difference,574.000,-148.15%,-1.96
+$ADVN,NYSE Advanced issues,1607.000,+113.13%,0.55
+$DECN,NYSE Declined issues,1033.000,-46.92%,-0.37
+$DVOL,NYSE Declined volume,445058.000,-48.99%,-0.39
+$TICK,NYSE TICK,-468.000,+387.50%,0.59
+$TRIN,NYSE TRIN,1.070,+15.05%,0.35
+$TVOL,NYSE Total volume,1101321.000,-11.73%,-0.17
+$UNCN,NYSE Unchanged issues,108.000,+107.69%,0.2
+$UVOL,NYSE Advanced volume,646769.000,+77.72%,0.11
+$VOLD,NYSE Up Volume - Down Volume Difference,201710409.000,-139.66%,-2.43
+$ADDC,NYSE Composite Advancing Issues - Declining Issues Difference,694.000,-153.97%,-1.98
+$ADVNC,NYSE Composite Advanced issues,1785.000,+115.58%,0.62
+$DECNC,NYSE Composite Declined issues,1091.000,-48.39%,-0.4
+$DVOLC,NYSE Composite Declined volume,2097857.000,-47.24%,-0.35
+$TICKC,NYSE Composite TICK,-505.000,+591.78%,0.44
+$TRINC,NYSE Composite TRIN,1.260,+20.00%,0.46
+$TVOLC,NYSE Composite Total volume,4849144.000,-11.78%,-0.14
+$UNCNC,NYSE Composite Unchanged issues,113.000,+113.21%,0.24
+$UVOLC,NYSE Composite Advanced volume,2718085.000,+84.10%,0.19
+$VOLDC,NYSE Composite Up Volume - Down Volume Difference,620228197.220,-124.81%,-1.65
+$ADAD,NYSE MKT (AMEX) Advancing Issues - Declining Issues Difference,-80.000,-31.03%,0.86
+$ADVA,NYSE MKT (AMEX) Advanced issues,97.000,+22.78%,-0.14
+$DECA,NYSE MKT (AMEX) Declined issues,177.000,-9.23%,0.13
+$DVOA,NYSE MKT (AMEX) Declined volume,10504.000,-7.62%,-0.24
+$TICKA,NYSE MKT (AMEX) TICK,-33.000,-29.79%,-33.95
+$TRINA,NYSE MKT (AMEX) TRIN,2.090,+216.67%,0.88
+$TVOA,NYSE MKT (AMEX) Total volume,14093.000,-23.75%,-0.41
+$UNCA,NYSE MKT (AMEX) Unchanged issues,13.000,0.00%,-0.35
+$UVOA,NYSE MKT (AMEX) Advanced volume,2754.000,-60.39%,-0.7
+$VOLAD,NYSE MKT (AMEX) Up Volume - Down Volume Difference,-7750551.000,+75.42%,0.6
+$ADADC,NYSE MKT (AMEX) Composite Advancing Issues - Declining Issues Difference,-82.000,-27.43%,0.9
+$ADVAC,NYSE MKT (AMEX) Composite Advanced issues,96.000,+18.52%,-0.15
+$DECAC,NYSE MKT (AMEX) Composite Declined issues,178.000,-8.25%,0.14
+$DVOAC,NYSE MKT (AMEX) Composite Declined volume,246565.000,+43.47%,0.14
+$TICKAC,NYSE MKT (AMEX) Composite TICK,-47.000,+11.90%,-16.64
+$TRINAC,NYSE MKT (AMEX) Composite TRIN,3.080,+805.88%,4.49
+$TVOAC,NYSE MKT (AMEX) Composite Total volume,315412.000,-18.10%,-0.38
+$UNCAC,NYSE MKT (AMEX) Composite Unchanged issues,14.000,+7.69%,-0.3
+$UVOAC,NYSE MKT (AMEX) Composite Advanced volume,43110.000,-79.66%,-0.85
+$VOLADC,NYSE MKT (AMEX) Composite Up Volume - Down Volume Difference,-203454222.400,-607.31%,-4.25
+$ADARD,NYSE ARCA Advancing Issues - Declining Issues Difference,518.000,-128.60%,-1.42
+$ADVAR,NYSE ARCA Advanced issues,1581.000,+271.13%,1.29
+$VOLARD,NYSE ARCA Up Volume - Down Volume Difference,40195833.000,-133.77%,-3.1
+$DECAR,NYSE ARCA Declined issues,1063.000,-52.48%,-0.45
+$DVOAR,NYSE ARCA Declined volume,119945.000,-44.09%,-0.5
+$TICKAR,NYSE ARCA TICK,0,-100.00%,-1.0
+$TRINAR,NYSE ARCA TRIN,1.110,+158.14%,1.84
+$TVOAR,NYSE ARCA Total volume,294118.000,-5.42%,-0.36
+$UNCAR,NYSE ARCA Unchanged issues,48.000,+71.43%,0.92
+$UVOAR,NYSE ARCA Advanced volume,160141.000,+67.70%,-0.27
+$ADARDC,NYSE ARCA Composite Advancing Issues - Declining Issues Difference,516.000,-132.05%,-1.43
+$ADVARC,NYSE ARCA Composite Advanced issues,1462.000,+242.39%,1.36
+$DECARC,NYSE ARCA Composite Declined issues,946.000,-53.56%,-0.48
+$DVOARC,NYSE ARCA Composite Declined volume,718157.000,-47.57%,-0.55
+$TICKARC,NYSE ARCA Composite TICK,54.000,+80.00%,-0.8
+$TRINARC,NYSE ARCA Composite TRIN,1.130,+109.26%,2.13
+$TVOARC,NYSE ARCA Composite Total volume,1824628.000,-4.65%,-0.42
+$UNCARC,NYSE ARCA Composite Unchanged issues,48.000,+108.70%,1.0
+$UVOARC,NYSE ARCA Composite Advanced volume,985089.000,+86.60%,-0.36
+$VOLARDC,NYSE ARCA Composite Up Volume - Down Volume Difference,266932454.510,-131.71%,-4.87
+$ADQD,NASDAQ Advancing Issues - Declining Issues Difference,-581.000,-72.49%,-0.63
+$ADVN/Q,NASDAQ Advanced issues,2170.000,+56.12%,0.32
+$DECN/Q,NASDAQ Declined issues,2751.000,-21.44%,-0.14
+$DVOL/Q,NASDAQ Declined volume,942362.000,-16.48%,-0.22
+$TICK/Q,NASDAQ TICK,-242.000,-58.06%,10.51
+$TRIN/Q,NASDAQ TRIN,1.250,+37.36%,0.47
+$TVOL/Q,NASDAQ Total volume,1547918.000,-4.92%,-0.2
+$UNCN/Q,NASDAQ Unchanged issues,215.000,+5.39%,-0.01
+$UVOL/Q,NASDAQ Advanced volume,593732.000,+21.18%,-0.19
+$VOLQD,NASDAQ Up Volume - Down Volume Difference,-348630056.000,-45.39%,-0.27
+$ADQDC,NASDAQ Composite Advancing Issues - Declining Issues Difference,-552.000,-71.85%,-0.64
+$ADVNC/Q,NASDAQ Composite Advanced issues,2100.000,+52.73%,0.3
+$DECNC/Q,NASDAQ Composite Declined issues,2652.000,-20.50%,-0.16
+$DVOLC/Q,NASDAQ Composite Declined volume,4624742.000,-9.92%,-0.23
+$TICKC/Q,NASDAQ Composite TICK,-105.000,-75.81%,0.33
+$TRINC/Q,NASDAQ Composite TRIN,1.390,+65.48%,0.61
+$TVOLC/Q,NASDAQ Composite Total volume,7283899.000,-5.19%,-0.24
+$UNCNC/Q,NASDAQ Composite Unchanged issues,157.000,-13.26%,-0.19
+$UVOLC/Q,NASDAQ Composite Advanced volume,2626319.000,+4.72%,-0.27
+$VOLQDC,NASDAQ Composite Up Volume - Down Volume Difference,-1998422664.600,-23.90%,-0.18
+$ADID,DJIA Advancing Issues - Declining Issues Difference,16.000,-300.00%,1.0
+$ADVI,DJIA Advanced issues,23.000,+109.09%,0.21
+$DECLI,DJIA Declined issues,7.000,-63.16%,-0.36
+$DVOLI,DJIA Declined volume,45128.000,-62.57%,0.24
+$TIKI,DJIA TICK,2.000,-88.89%,-1.07
+$TRINI,DJIA TRIN,1.820,-34.53%,2.08
+$TVOLI,DJIA Total volume,126408.000,-13.20%,-0.12
+$UNCHI,DJIA Unchanged issues,0,<empty>,NaN
+$UVOLI,DJIA Advanced volume,81281.000,+224.15%,-0.24
+$VOLID,DJIA Up Volume - Down Volume Difference,36153204.000,-137.86%,-0.48
+$ADIDC,DJIA Composite Advancing Issues - Declining Issues Difference,16.000,-300.00%,1.0
+$ADVIC,DJIA Composite Advanced issues,23.000,+109.09%,0.21
+$DECLIC,DJIA Composite Declined issues,7.000,-63.16%,-0.36
+$DVOLIC,DJIA Composite Declined volume,165011.000,-59.83%,0.25
+$TIKIC,DJIA Composite TICK,2.000,-85.71%,-1.08
+$TRINIC,DJIA Composite TRIN,1.990,-29.43%,2.2
+$TVOLIC,DJIA Composite Total volume,436993.000,-11.73%,-0.12
+$UNCHIC,DJIA Composite Unchanged issues,0,<empty>,NaN
+$UVOLIC,DJIA Composite Advanced volume,271982.000,+222.76%,-0.26
+$VOLIDC,DJIA Composite Up Volume - Down Volume Difference,106971547.820,-132.76%,-0.54
+$ADSPD,S&P500 Advancing Issues - Declining Issues Difference,227.000,-394.81%,13.17
+$ADVSP,S&P500 Advanced issues,363.000,+72.04%,0.4
+$DECLSP,S&P500 Declined issues,136.000,-52.78%,-0.44
+$DVOLSP,S&P500 Declined volume,339240.000,-47.94%,-0.22
+$TIKSP,S&P500 TICK,-89.000,-228.99%,-0.46
+$TRINSP,S&P500 TRIN,1.870,+6.25%,0.91
+$TVOLSP,S&P500 Total volume,824283.000,-10.69%,-0.1
+$UNCHSP,S&P500 Unchanged issues,0,<empty>,-1.0
+$UVOLSP,S&P500 Advanced volume,485043.000,+78.78%,0.02
+$VOLSPD,S&P500 Up Volume - Down Volume Difference,145803653.000,-138.34%,2.78
+$ADSPDC,S&P500 Composite Advancing Issues - Declining Issues Difference,227.000,-394.81%,13.17
+$ADVSPC,S&P500 Composite Advanced issues,363.000,+72.04%,0.4
+$DECLSPC,S&P500 Composite Declined issues,136.000,-52.78%,-0.44
+$DVOLSPC,S&P500 Composite Declined volume,1232118.000,-46.97%,-0.21
+$TIKSPC,S&P500 Composite TICK,-99.000,-243.48%,-0.39
+$TRINSPC,S&P500 Composite TRIN,1.930,+7.82%,0.89
+$TVOLSPC,S&P500 Composite Total volume,2933882.000,-10.46%,-0.08
+$UNCHSPC,S&P500 Composite Unchanged issues,0,<empty>,-1.0
+$UVOLSPC,S&P500 Composite Advanced volume,1701764.000,+78.54%,0.04
+$VOLSPDC,S&P500 Composite Up Volume - Down Volume Difference,469646021.900,-134.27%,5.62
+$ADNDD,NASDAQ 100 Advancing Issues - Declining Issues Difference,11.000,-137.93%,-1.73
+$ADVND,NASDAQ 100 Advanced issues,57.000,+54.05%,0.32
+$DECLND,NASDAQ 100 Declined issues,46.000,-30.30%,-0.21
+$DVOLND,NASDAQ 100 Declined volume,241729.000,-22.07%,0.01
+$TIKND,NASDAQ 100 TICK,-25.000,+31.58%,0.47
+$TRINND,NASDAQ 100 TRIN,1.940,+30.20%,0.71
+$TVOLND,NASDAQ 100 Total volume,396144.000,-7.27%,0.0
+$UNCHND,NASDAQ 100 Unchanged issues,0,<empty>,NaN
+$UVOLND,NASDAQ 100 Advanced volume,154415.000,+31.97%,-0.01
+$VOLNDD,NASDAQ 100 Up Volume - Down Volume Difference,-87314137.000,-54.80%,0.06
+$ADNDDC,NASDAQ 100 Composite Advancing Issues - Declining Issues Difference,11.000,-137.93%,-1.73
+$ADVNDC,NASDAQ 100 Composite Advanced issues,57.000,+54.05%,0.32
+$DECLNDC,NASDAQ 100 Composite Declined issues,46.000,-30.30%,-0.21
+$DVOLNDC,NASDAQ 100 Composite Declined volume,848167.000,-15.72%,0.01
+$TIKNDC,NASDAQ 100 Composite TICK,-25.000,+66.67%,2.57
+$TRINNDC,NASDAQ 100 Composite TRIN,2.390,+61.49%,0.88
+$TVOLNDC,NASDAQ 100 Composite Total volume,1287638.000,-7.12%,-0.03
+$UNCHNDC,NASDAQ 100 Composite Unchanged issues,0,<empty>,NaN
+$UVOLNDC,NASDAQ 100 Composite Advanced volume,439471.000,+15.67%,-0.1
+$VOLNDDC,NASDAQ 100 Composite Up Volume - Down Volume Difference,-408695637.610,-34.76%,0.17
+$ADRLD,RUSSELL 2000 Advancing Issues - Declining Issues Difference,176.000,-130.40%,-1.33
+$ADVRL,RUSSELL 2000 Advanced issues,914.000,+69.26%,0.58
+$DECLRL,RUSSELL 2000 Declined issues,738.000,-34.05%,-0.33
+$DVOLRL,RUSSELL 2000 Declined volume,381237.000,-11.68%,-0.29
+$TIKRL,RUSSELL 2000 TICK,-133.000,-17.90%,-0.16
+$TRINRL,RUSSELL 2000 TRIN,2.060,+139.53%,1.31
+$TVOLRL,RUSSELL 2000 Total volume,619063.000,-8.93%,-0.28
+$UNCHRL,RUSSELL 2000 Unchanged issues,29.000,+26.09%,-0.07
+$UVOLRL,RUSSELL 2000 Advanced volume,228877.000,-5.24%,-0.28
+$VOLRLD,RUSSELL 2000 Up Volume - Down Volume Difference,-152360102.000,-19.86%,-0.31
+$ADRLDC,RUSSELL 2000 Composite Advancing Issues - Declining Issues Difference,176.000,-130.45%,-1.33
+$ADVRLC,RUSSELL 2000 Composite Advanced issues,914.000,+68.95%,0.57
+$DECLRLC,RUSSELL 2000 Composite Declined issues,738.000,-34.05%,-0.33
+$DVOLRLC,RUSSELL 2000 Composite Declined volume,1695614.000,-5.93%,-0.24
+$TIKRLC,RUSSELL 2000 Composite TICK,-140.000,-33.01%,-0.13
+$TRINRLC,RUSSELL 2000 Composite TRIN,2.330,+156.04%,1.48
+$TVOLRLC,RUSSELL 2000 Composite Total volume,2627008.000,-5.42%,-0.25
+$UNCHRLC,RUSSELL 2000 Composite Unchanged issues,30.000,+20.00%,0.0
+$UVOLRLC,RUSSELL 2000 Composite Advanced volume,900879.000,-5.57%,-0.28
+$VOLRLDC,RUSSELL 2000 Composite Up Volume - Down Volume Difference,-794734822.920,-6.33%,-0.19
+$ADUSD,ALLUSA Advancing Issues - Declining Issues Difference,614.000,-109.52%,-1.15
+$ADVUS,ALLUSA Advanced issues,6346.000,+123.37%,0.66
+$DECLUS,ALLUSA Declined issues,5732.000,-38.30%,-0.28
+$DVOLUS,ALLUSA Declined volume,1558229.000,-31.01%,-0.3
+$TIKUS,ALLUSA TICK,-736.000,-43.38%,-13.89
+$TRINUS,ALLUSA TRIN,1.210,+72.86%,0.75
+$TVOLUS,ALLUSA Total volume,3016403.000,-7.75%,-0.21
+$UNCHUS,ALLUSA Unchanged issues,406.000,+28.48%,0.03
+$UVOLUS,ALLUSA Advanced volume,1421177.000,+43.74%,-0.09
+$VOLUSD,ALLUSA Up Volume - Down Volume Difference,-137051342.000,-89.21%,-0.8
+$ADUSDC,ALLUSA Composite Advancing Issues - Declining Issues Difference,599.000,-110.23%,-1.15
+$ADVUSC,ALLUSA Composite Advanced issues,5988.000,+113.86%,0.65
+$DECLUSC,ALLUSA Composite Declined issues,5389.000,-37.76%,-0.3
+$DVOLUSC,ALLUSA Composite Declined volume,8124368.000,-26.32%,-0.3
+$TIKUSC,ALLUSA Composite TICK,-600.000,+22.45%,6.22
+$TRINUSC,ALLUSA Composite TRIN,1.370,+95.71%,0.95
+$TVOLUSC,ALLUSA Composite Total volume,14948497.000,-7.70%,-0.24
+$UNCHUSC,ALLUSA Composite Unchanged issues,346.000,+20.98%,0.0
+$UVOLUSC,ALLUSA Composite Advanced volume,6590299.000,+30.23%,-0.16
+$VOLUSDC,ALLUSA Composite Up Volume - Down Volume Difference,-1534068480.210,-74.29%,-0.59
+$NYHI1W,NYSE New Highs 1W,393.000,+0.26%,0.26
+$NYHI2W,NYSE New Highs 2W,308.000,+6.21%,0.28
+$NYHI1M,NYSE New Highs 1M,209.000,+10.58%,0.13
+$NYHI3M,NYSE New Highs 3M,129.000,+92.54%,0.2
+$NYHI6M,NYSE New Highs 6M,95.000,+115.91%,0.09
+$NYHI9M,NYSE New Highs 9M,90.000,+114.29%,0.21
+$NYHGH,NYSE New Highs 1Y,84.000,+110.00%,0.25
+$NYLO1W,NYSE New Lows 1W,560.000,-54.47%,-0.35
+$NYLO2W,NYSE New Lows 2W,447.000,-47.72%,-0.2
+$NYLO1M,NYSE New Lows 1M,281.000,-39.83%,-0.3
+$NYLO3M,NYSE New Lows 3M,154.000,-34.47%,0.08
+$NYLO6M,NYSE New Lows 6M,89.000,-40.67%,-0.11
+$NYLO9M,NYSE New Lows 9M,77.000,-44.20%,-0.1
+$NYLOW,NYSE New Lows 1Y,70.000,-47.37%,-0.09
+$AMHI1W,NYSE MKT (AMEX) New Highs 1W,31.000,-26.19%,-0.16
+$AMHI2W,NYSE MKT (AMEX) New Highs 2W,20.000,-28.57%,-0.29
+$AMHI1M,NYSE MKT (AMEX) New Highs 1M,11.000,-31.25%,-0.52
+$AMHI3M,NYSE MKT (AMEX) New Highs 3M,5.000,+150.00%,-0.5
+$AMHI6M,NYSE MKT (AMEX) New Highs 6M,5.000,+150.00%,0.25
+$AMHI9M,NYSE MKT (AMEX) New Highs 9M,5.000,+150.00%,0.66
+$AMHGH,NYSE MKT (AMEX) New Highs 1Y,5.000,+150.00%,0.66
+$AMLO1W,NYSE MKT (AMEX) New Lows 1W,63.000,-4.55%,-0.15
+$AMLO2W,NYSE MKT (AMEX) New Lows 2W,50.000,-3.85%,-0.09
+$AMLO1M,NYSE MKT (AMEX) New Lows 1M,40.000,-2.44%,0.11
+$AMLO3M,NYSE MKT (AMEX) New Lows 3M,27.000,+8.00%,0.5
+$AMLO6M,NYSE MKT (AMEX) New Lows 6M,23.000,+35.29%,0.35
+$AMLO9M,NYSE MKT (AMEX) New Lows 9M,21.000,+31.25%,0.31
+$AMLOW,NYSE MKT (AMEX) New Lows 1Y,19.000,+26.67%,0.36
+$ARHI1W,NYSE ARCA New Highs 1W,258.000,-6.52%,0.12
+$ARHI2W,NYSE ARCA New Highs 2W,198.000,0.00%,0.29
+$ARHI1M,NYSE ARCA New Highs 1M,125.000,-3.85%,-0.02
+$ARHI3M,NYSE ARCA New Highs 3M,77.000,+133.33%,-0.13
+$ARHI6M,NYSE ARCA New Highs 6M,72.000,+200.00%,-0.07
+$ARHI9M,NYSE ARCA New Highs 9M,72.000,+213.04%,0.01
+$ARHGH,NYSE ARCA New Highs 1Y,72.000,+227.27%,0.03
+$ARLO1W,NYSE ARCA New Lows 1W,273.000,-77.46%,-0.62
+$ARLO2W,NYSE ARCA New Lows 2W,252.000,-75.25%,0.04
+$ARLO1M,NYSE ARCA New Lows 1M,180.000,-69.95%,0.36
+$ARLO3M,NYSE ARCA New Lows 3M,95.000,-75.70%,3.12
+$ARLO6M,NYSE ARCA New Lows 6M,59.000,-79.23%,2.27
+$ARLO9M,NYSE ARCA New Lows 9M,54.000,-80.65%,2.37
+$ARLOW,NYSE ARCA New Lows 1Y,50.000,-79.08%,2.57
+$NAHI1W,NASDAQ New Highs 1W,527.000,-7.22%,-0.01
+$NAHI1M,NASDAQ New Highs 1M,216.000,+22.03%,-0.3
+$NAHI3M,NASDAQ New Highs 3M,134.000,+54.02%,-0.3
+$NAHI6M,NASDAQ New Highs 6M,105.000,+56.72%,-0.22
+$NAHI9M,NASDAQ New Highs 9M,97.000,+59.02%,-0.12
+$NAHGH,NASDAQ New Highs 1Y,96.000,+65.52%,-0.1
+$NALO1W,NASDAQ New Lows 1W,1267.000,-36.36%,-0.18
+$NALO2W,NASDAQ New Lows 2W,1086.000,-28.13%,0.18
+$NALO1M,NASDAQ New Lows 1M,748.000,-14.61%,0.22
+$NALO3M,NASDAQ New Lows 3M,439.000,-14.09%,0.69
+$NALO6M,NASDAQ New Lows 6M,308.000,-20.21%,0.37
+$NALO9M,NASDAQ New Lows 9M,280.000,-23.29%,0.34
+$NALOW,NASDAQ New Lows 1Y,261.000,-21.15%,0.36
+$ETFHI1W,ETF New Highs 1W,347.000,-11.48%,0.06
+$ETFHI2W,ETF New Highs 2W,262.000,-1.87%,0.15
+$ETFHI1M,ETF New Highs 1M,166.000,-2.92%,-0.1
+$ETFHI3M,ETF New Highs 3M,101.000,+94.23%,-0.19
+$ETFHI6M,ETF New Highs 6M,89.000,+147.22%,-0.15
+$ETFHI9M,ETF New Highs 9M,89.000,+169.70%,-0.05
+$ETFHGH,ETF New Highs 1Y,89.000,+178.13%,-0.04
+$ETFLO1W,ETF New Lows 1W,501.000,-71.77%,-0.54
+$ETFLO2W,ETF New Lows 2W,468.000,-68.63%,0.26
+$ETFLO1M,ETF New Lows 1M,341.000,-62.20%,0.58
+$ETFLO3M,ETF New Lows 3M,182.000,-69.05%,2.79
+$ETFLO6M,ETF New Lows 6M,118.000,-73.24%,1.81
+$ETFLO9M,ETF New Lows 9M,108.000,-75.12%,1.77
+$ETFLOW,ETF New Lows 1Y,103.000,-72.68%,2.02
+$PCALL,Put/Call ratio for all OCC options,.849,-2.10%,0.23
+$PCI,Put/Call ratio for all DJI Average constituents options,.548,-2.63%,0.41
+$PCRL,Put/Call ratio for all Russell 2000 constituents options,.470,+4.05%,0.3
+$PCSP,Put/Call ratio for all SP500 constituents options,.675,+1.96%,0.34
+$PCND,Put/Call ratio for all NASDAQ 100 constituents options,.717,+2.09%,0.4
