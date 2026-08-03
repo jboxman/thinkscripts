@@ -1,0 +1,459 @@
+# SPX 5% Exact Swing-Low Strategy (Hindsight Study)
+#
+# Purpose:
+#   Test the outcome of buying the charted security as if the exact SPX swing
+#   bottom had been known. This strategy intentionally uses future bars and
+#   repaints historical signals. It cannot generate a live, causal entry.
+#
+# Setup:
+#   - Track the highest SPX close since the prior trade exited.
+#   - Require an SPX decline of at least declinePercent from that peak.
+#   - The SPX close must be the lowest close in a centered window consisting of
+#     pivotLeftBars historical sessions and pivotRightBars future sessions.
+#   - Require the charted security to close above its trend SMA, if enabled.
+#
+# Exit:
+#   - Close the charted-security position holdingBars sessions after entry.
+#   - Reset the SPX peak after the exit and begin a new swing episode.
+#
+# Apply to a DAILY chart. The default 20/20 pivot window rejects the interim
+# February and March 2020 lows and identifies March 23 as the SPX closing low.
+
+declare upper;
+declare hide_on_intraday;
+
+input referenceSymbol = "SPX";
+input declinePercent = 5.0;
+input pivotLeftBars = 20;
+input pivotRightBars = 20;
+input holdingBars = 10;
+input executionTiming = {default swingLowClose, nextBarOpen};
+input requireAboveTrendSMA = yes;
+input trendSMALength = 200;
+
+input tradeSize = 1;
+input initialCapital = 100000.0;
+input useAutomaticPointValue = yes;
+input dollarsPerPointOverride = 1.0;
+input slippageTicksPerSide = 0.0;
+input commissionPerContractPerSide = 0.0;
+
+input useDateFilter = no;
+input startDate = 20100101;
+input endDate = 20991231;
+
+input showTrendSMA = yes;
+input showSwingSignals = yes;
+input showSignalBubbles = yes;
+input showFilteredSignals = yes;
+input showPerformanceLabels = yes;
+input showStateLabels = yes;
+input showSPXPeakPlot = no;
+input showSPXDrawdownPlot = no;
+
+Assert(declinePercent > 0 and declinePercent < 100,
+       "declinePercent must be greater than zero and less than 100");
+Assert(pivotLeftBars > 0, "pivotLeftBars must be greater than zero");
+Assert(pivotRightBars > 0, "pivotRightBars must be greater than zero");
+Assert(holdingBars > 0, "holdingBars must be greater than zero");
+Assert(trendSMALength > 0, "trendSMALength must be greater than zero");
+Assert(tradeSize > 0, "tradeSize must be greater than zero");
+Assert(initialCapital > 0, "initialCapital must be greater than zero");
+Assert(dollarsPerPointOverride > 0,
+       "dollarsPerPointOverride must be greater than zero");
+Assert(slippageTicksPerSide >= 0,
+       "slippageTicksPerSide cannot be negative");
+Assert(commissionPerContractPerSide >= 0,
+       "commissionPerContractPerSide cannot be negative");
+Assert(!useDateFilter or startDate <= endDate,
+       "startDate must be before or equal to endDate");
+
+# Direct RGB colors avoid thinkorswim palette initialization failures.
+
+def isDaily = GetAggregationPeriod() == AggregationPeriod.DAY;
+def executeAtSwingClose =
+    executionTiming == executionTiming.swingLowClose;
+def inDateRange =
+    !useDateFilter or
+    (GetYYYYMMDD() >= startDate and GetYYYYMMDD() <= endDate);
+
+def spxClose = close(symbol = referenceSymbol);
+def validChartBar = !IsNaN(open) and !IsNaN(close);
+def validReferenceBar = !IsNaN(spxClose);
+
+def trendSMA = Average(close, trendSMALength);
+def trendSMAAvailable = !IsNaN(trendSMA);
+def trendFilterOK =
+    !requireAboveTrendSMA or
+    (trendSMAAvailable and close > trendSMA);
+
+def pivotWindow = pivotLeftBars + pivotRightBars + 1;
+def completePivotWindow =
+    !IsNaN(spxClose[pivotLeftBars]) and
+    !IsNaN(spxClose[-pivotRightBars]);
+
+# This negative offset is intentional. It places the signal on the historical
+# bottom after pivotRightBars future sessions prove it was the centered low.
+def exactSPXSwingLow =
+    completePivotWindow and
+    spxClose == Lowest(spxClose[-pivotRightBars], pivotWindow);
+
+def trackedSPXPeak;
+def spxDrawdownPercent;
+def swingEvent;
+def filteredSignal;
+def rawSignal;
+def cycleConsumed;
+def position;
+def barsHeld;
+def longEntryEvent;
+def exitEvent;
+
+# Calculate swing eligibility from prior initialized state. Using the current
+# tracked peak here would create a dependency loop because a filtered swing also
+# resets that peak on the current bar.
+def swingReferencePeak =
+    if validReferenceBar then
+        if IsNaN(trackedSPXPeak[1])
+        then spxClose
+        else Max(trackedSPXPeak[1], spxClose)
+    else trackedSPXPeak[1];
+def swingDrawdownPercent =
+    if !IsNaN(swingReferencePeak) and
+       swingReferencePeak > 0 and
+       validReferenceBar
+    then 100 * (swingReferencePeak - spxClose) / swingReferencePeak
+    else Double.NaN;
+
+cycleConsumed = CompoundValue(
+    1,
+    if exitEvent then 0
+    else if rawSignal then 1
+    else cycleConsumed[1],
+    0
+);
+
+trackedSPXPeak = CompoundValue(
+    1,
+    if exitEvent then
+        if validReferenceBar then spxClose else Double.NaN
+    else if filteredSignal[1] then spxClose
+    else if cycleConsumed[1] == 0 and validReferenceBar then
+        if IsNaN(trackedSPXPeak[1])
+        then spxClose
+        else Max(trackedSPXPeak[1], spxClose)
+    else trackedSPXPeak[1],
+    if validReferenceBar then spxClose else Double.NaN
+);
+
+spxDrawdownPercent =
+    if !IsNaN(trackedSPXPeak) and
+       trackedSPXPeak > 0 and
+       validReferenceBar
+    then 100 * (trackedSPXPeak - spxClose) / trackedSPXPeak
+    else Double.NaN;
+
+swingEvent =
+    isDaily and
+    inDateRange and
+    validChartBar and
+    validReferenceBar and
+    cycleConsumed[1] == 0 and
+    swingDrawdownPercent >= declinePercent and
+    exactSPXSwingLow;
+
+rawSignal = swingEvent and trendFilterOK;
+filteredSignal = swingEvent and !trendFilterOK;
+
+# In the default hindsight model, calculations enter at the charted security's
+# swing-day close. AddOrder itself draws on the following bar even though its
+# displayed price is the prior close. The alternate model uses the next open.
+longEntryEvent =
+    if executeAtSwingClose
+    then rawSignal and position[1] == 0
+    else rawSignal[1] and position[1] == 0 and validChartBar;
+
+exitEvent =
+    position[1] == 1 and
+    barsHeld[1] >= holdingBars - 1 and
+    validChartBar;
+
+position = CompoundValue(
+    1,
+    if exitEvent then 0
+    else if longEntryEvent then 1
+    else position[1],
+    0
+);
+
+barsHeld = CompoundValue(
+    1,
+    if longEntryEvent then 0
+    else if position == 1 then barsHeld[1] + 1
+    else 0,
+    0
+);
+
+def longEntryOrder =
+    if executeAtSwingClose
+    then longEntryEvent
+    else rawSignal and position == 0;
+def longExitOrder =
+    if executeAtSwingClose
+    then exitEvent
+    else position == 1 and barsHeld >= holdingBars - 1;
+
+def entryOrderPrice = if executeAtSwingClose then close else open[-1];
+def exitOrderPrice = if executeAtSwingClose then close else open[-1];
+
+AddOrder(
+    OrderType.BUY_TO_OPEN,
+    longEntryOrder,
+    entryOrderPrice,
+    tradeSize,
+    CreateColor(0, 197, 49),
+    CreateColor(0, 197, 49),
+    "Exact SPX swing low"
+);
+
+AddOrder(
+    OrderType.SELL_TO_CLOSE,
+    longExitOrder,
+    exitOrderPrice,
+    tradeSize,
+    CreateColor(255, 255, 0),
+    CreateColor(255, 255, 0),
+    "Timed exit"
+);
+
+plot ChartTrendSMA =
+    if showTrendSMA then trendSMA else Double.NaN;
+ChartTrendSMA.SetDefaultColor(CreateColor(211, 211, 211));
+ChartTrendSMA.SetLineWeight(2);
+ChartTrendSMA.HideBubble();
+
+plot SPXPeak =
+    if showSPXPeakPlot then trackedSPXPeak else Double.NaN;
+SPXPeak.SetDefaultColor(CreateColor(0, 255, 255));
+SPXPeak.SetStyle(Curve.SHORT_DASH);
+SPXPeak.SetLineWeight(2);
+SPXPeak.HideBubble();
+
+plot SPXDrawdown =
+    if showSPXDrawdownPlot then spxDrawdownPercent else Double.NaN;
+SPXDrawdown.SetDefaultColor(CreateColor(255, 95, 95));
+SPXDrawdown.SetLineWeight(2);
+SPXDrawdown.HideBubble();
+
+plot SwingLowSignal =
+    if showSwingSignals and rawSignal
+    then low - 2 * TickSize()
+    else Double.NaN;
+SwingLowSignal.SetPaintingStrategy(PaintingStrategy.ARROW_UP);
+SwingLowSignal.SetDefaultColor(CreateColor(0, 197, 49));
+SwingLowSignal.SetLineWeight(4);
+SwingLowSignal.HideBubble();
+SwingLowSignal.HideTitle();
+
+plot FilteredSwingLow =
+    if showFilteredSignals and filteredSignal
+    then high + 2 * TickSize()
+    else Double.NaN;
+FilteredSwingLow.SetPaintingStrategy(PaintingStrategy.ARROW_DOWN);
+FilteredSwingLow.SetDefaultColor(CreateColor(255, 95, 95));
+FilteredSwingLow.SetLineWeight(3);
+FilteredSwingLow.HideBubble();
+FilteredSwingLow.HideTitle();
+
+AddChartBubble(
+    showSignalBubbles and rawSignal,
+    low,
+    "EXACT SPX LOW | " +
+    AsText(Round(swingDrawdownPercent, 1)) + "% decline",
+    CreateColor(0, 197, 49),
+    no
+);
+
+AddChartBubble(
+    showSignalBubbles and showFilteredSignals and filteredSignal,
+    high,
+    if trendSMAAvailable
+    then "FILTERED: below " + trendSMALength + "d SMA"
+    else "FILTERED: " + trendSMALength + "d SMA unavailable",
+    CreateColor(255, 95, 95),
+    yes
+);
+
+# Dollar-normalized performance statistics.
+def symbolTickSize = TickSize();
+def symbolTickValue = TickValue();
+def automaticPointValue =
+    if symbolTickSize > 0 and symbolTickValue > 0
+    then symbolTickValue / symbolTickSize
+    else dollarsPerPointOverride;
+def dollarsPerPoint =
+    if useAutomaticPointValue
+    then automaticPointValue
+    else dollarsPerPointOverride;
+def slippagePerSide = slippageTicksPerSide * symbolTickSize;
+
+def unadjustedEntryPrice = if executeAtSwingClose then close else open;
+def modeledEntryPrice = CompoundValue(
+    1,
+    if longEntryEvent
+    then unadjustedEntryPrice + slippagePerSide
+    else modeledEntryPrice[1],
+    0
+);
+
+def unadjustedExitPrice = if executeAtSwingClose then close else open;
+def modeledExitPrice = unadjustedExitPrice - slippagePerSide;
+def roundTripCommission =
+    2 * commissionPerContractPerSide * tradeSize;
+def closedTradePL =
+    if exitEvent
+    then (modeledExitPrice - modeledEntryPrice[1]) *
+         dollarsPerPoint * tradeSize - roundTripCommission
+    else 0;
+
+def totalTrades = CompoundValue(
+    1,
+    totalTrades[1] + (if exitEvent then 1 else 0),
+    0
+);
+def winningTrades = CompoundValue(
+    1,
+    winningTrades[1] +
+        (if exitEvent and closedTradePL > 0 then 1 else 0),
+    0
+);
+def grossWins = CompoundValue(
+    1,
+    grossWins[1] +
+        (if exitEvent and closedTradePL > 0 then closedTradePL else 0),
+    0
+);
+def grossLosses = CompoundValue(
+    1,
+    grossLosses[1] +
+        (if exitEvent and closedTradePL < 0 then closedTradePL else 0),
+    0
+);
+def realizedPL = CompoundValue(
+    1,
+    realizedPL[1] + closedTradePL,
+    0
+);
+
+def openPL =
+    if position == 1
+    then (close - modeledEntryPrice) * dollarsPerPoint * tradeSize -
+         commissionPerContractPerSide * tradeSize
+    else 0;
+def equity = initialCapital + realizedPL + openPL;
+def equityPeak = CompoundValue(
+    1,
+    Max(equityPeak[1], equity),
+    initialCapital
+);
+def currentDrawdown = Max(0, equityPeak - equity);
+def currentDrawdownPercent =
+    if equityPeak > 0 then 100 * currentDrawdown / equityPeak else 0;
+def maxDrawdown = CompoundValue(
+    1,
+    Max(maxDrawdown[1], currentDrawdown),
+    0
+);
+def maxDrawdownPercent = CompoundValue(
+    1,
+    Max(maxDrawdownPercent[1], currentDrawdownPercent),
+    0
+);
+
+def winRate =
+    if totalTrades > 0 then 100 * winningTrades / totalTrades else 0;
+def averageTrade =
+    if totalTrades > 0 then realizedPL / totalTrades else 0;
+def profitFactor =
+    if grossLosses < 0
+    then grossWins / AbsValue(grossLosses)
+    else 0;
+
+AddLabel(
+    yes,
+    "HINDSIGHT / REPAINTING: pivot needs " +
+    pivotRightBars + " future bars",
+    CreateColor(255, 95, 95)
+);
+AddLabel(
+    showStateLabels,
+    "SPX decline " + AsText(Round(spxDrawdownPercent, 1)) +
+    "% | pivot " + pivotLeftBars + "/" + pivotRightBars,
+    CreateColor(211, 211, 211)
+);
+AddLabel(
+    showStateLabels and requireAboveTrendSMA,
+    if !trendSMAAvailable then
+        "Trend filter: " + trendSMALength + "d SMA unavailable"
+    else if close > trendSMA then
+        "Trend filter: ABOVE " + trendSMALength + "d SMA"
+    else
+        "Trend filter: BELOW " + trendSMALength + "d SMA",
+    if trendSMAAvailable and close > trendSMA
+    then CreateColor(0, 197, 49)
+    else CreateColor(255, 95, 95)
+);
+AddLabel(
+    showPerformanceLabels,
+    if executeAtSwingClose
+    then "Model: exact swing-low close"
+    else "Model: next open",
+    if executeAtSwingClose
+    then CreateColor(255, 190, 70)
+    else CreateColor(211, 211, 211)
+);
+AddLabel(
+    showPerformanceLabels,
+    "Trades: " + totalTrades,
+    CreateColor(211, 211, 211)
+);
+AddLabel(
+    showPerformanceLabels,
+    "Net P/L: $" + Round(realizedPL, 2),
+    if realizedPL > 0 then CreateColor(0, 197, 49)
+    else if realizedPL < 0 then CreateColor(255, 95, 95)
+    else CreateColor(128, 128, 128)
+);
+AddLabel(
+    showPerformanceLabels,
+    "Win rate: " + Round(winRate, 1) + "%",
+    CreateColor(211, 211, 211)
+);
+AddLabel(
+    showPerformanceLabels,
+    "Avg trade: $" + Round(averageTrade, 2),
+    if averageTrade > 0 then CreateColor(0, 197, 49)
+    else if averageTrade < 0 then CreateColor(255, 95, 95)
+    else CreateColor(128, 128, 128)
+);
+AddLabel(
+    showPerformanceLabels,
+    "Profit factor: " + Round(profitFactor, 2),
+    CreateColor(211, 211, 211)
+);
+AddLabel(
+    showPerformanceLabels,
+    "Max DD: $" + Round(maxDrawdown, 2) +
+    " (" + Round(maxDrawdownPercent, 1) + "%)",
+    CreateColor(255, 95, 95)
+);
+AddLabel(
+    !isDaily,
+    "Designed for daily bars; orders are disabled",
+    CreateColor(255, 95, 95)
+);
+AddLabel(
+    IsNaN(spxClose),
+    "No data for reference symbol " + referenceSymbol,
+    CreateColor(255, 95, 95)
+);

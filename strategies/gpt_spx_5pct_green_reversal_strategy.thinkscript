@@ -1,0 +1,469 @@
+# SPX 5% Green-Reversal Strategy
+#
+# Setup:
+#   - While flat, track the highest SPX close since the previous trade exited.
+#   - Arm after SPX closes declinePercent or more below that tracked peak.
+#   - Buy the charted security on the first later SPX session that closes above
+#     both its open and its prior close, provided the charted security closes
+#     above its 200-day simple moving average.
+# Exit:
+#   - Close the position holdingBars chart sessions after entry.
+#   - Ignore new setups while the position is open, then reset the SPX peak on
+#     the exit session and begin tracking a new decline episode.
+#
+# Apply this strategy to a DAILY chart. SPX supplies the setup; all orders and
+# performance statistics use the charted security.
+
+declare upper;
+declare hide_on_intraday;
+
+input referenceSymbol = "SPX";
+input declinePercent = 5.0;
+input holdingBars = 10;
+input executionTiming = {default nextBarOpen, signalBarClose};
+input requireAboveTrendSMA = yes;
+input trendSMALength = 200;
+
+input tradeSize = 1;
+input initialCapital = 100000.0;
+input useAutomaticPointValue = yes;
+input dollarsPerPointOverride = 1.0;
+input slippageTicksPerSide = 0.0;
+input commissionPerContractPerSide = 0.0;
+
+input useDateFilter = no;
+input startDate = 20100101;
+input endDate = 20991231;
+
+input showSignal = yes;
+input showSignalBubble = yes;
+input showFilteredSignals = yes;
+input showTrendSMA = yes;
+input showPerformanceLabels = yes;
+input showStateLabels = yes;
+input showSPXPeakPlot = no;
+input showSPXDrawdownPlot = no;
+input showArmedPlot = no;
+
+Assert(declinePercent > 0 and declinePercent < 100,
+       "declinePercent must be greater than zero and less than 100");
+Assert(holdingBars > 0, "holdingBars must be greater than zero");
+Assert(trendSMALength > 0, "trendSMALength must be greater than zero");
+Assert(tradeSize > 0, "tradeSize must be greater than zero");
+Assert(initialCapital > 0, "initialCapital must be greater than zero");
+Assert(dollarsPerPointOverride > 0,
+       "dollarsPerPointOverride must be greater than zero");
+Assert(slippageTicksPerSide >= 0,
+       "slippageTicksPerSide cannot be negative");
+Assert(commissionPerContractPerSide >= 0,
+       "commissionPerContractPerSide cannot be negative");
+Assert(!useDateFilter or startDate <= endDate,
+       "startDate must be before or equal to endDate");
+
+# Use direct RGB colors throughout. Avoid palette-backed Color.* constants and
+# GUI-configurable GlobalColor lookups while a strategy instance initializes.
+
+def isDaily = GetAggregationPeriod() == AggregationPeriod.DAY;
+def executeAtClose =
+    executionTiming == executionTiming.signalBarClose;
+def inDateRange =
+    !useDateFilter or
+    (GetYYYYMMDD() >= startDate and GetYYYYMMDD() <= endDate);
+
+def spxOpen = open(symbol = referenceSymbol);
+def spxClose = close(symbol = referenceSymbol);
+def validReferenceBar =
+    !IsNaN(spxOpen) and
+    !IsNaN(spxClose) and
+    !IsNaN(spxClose[1]);
+def validChartBar = !IsNaN(open) and !IsNaN(close);
+def trendSMA = Average(close, trendSMALength);
+def trendSMAAvailable = !IsNaN(trendSMA);
+def trendFilterOK =
+    !requireAboveTrendSMA or
+    (trendSMAAvailable and close > trendSMA);
+def spxGreenReversal =
+    validReferenceBar and
+    spxClose > spxOpen and
+    spxClose > spxClose[1];
+
+# Forward declarations allow the signal, trade, and reset state machines to
+# refer to one another's prior-bar state without lookahead.
+def trackedSPXPeak;
+def spxDrawdownPercent;
+def setupArmed;
+def cycleConsumed;
+def spxReversalEvent;
+def filteredSignal;
+def rawSignal;
+def position;
+def barsHeld;
+def longEntryEvent;
+def exitEvent;
+
+# A consumed cycle begins on the reversal signal, including the one-bar wait
+# for next-open execution, and ends only when the resulting trade exits.
+cycleConsumed = CompoundValue(
+    1,
+    if exitEvent then 0
+    else if rawSignal then 1
+    else cycleConsumed[1],
+    0
+);
+
+# Reset to the exit session's SPX close. Otherwise, update the high-water mark
+# only while the current decline episode has not generated a trade.
+trackedSPXPeak = CompoundValue(
+    1,
+    if exitEvent then
+        if !IsNaN(spxClose) then spxClose else Double.NaN
+    else if filteredSignal then spxClose
+    else if cycleConsumed[1] == 0 and !IsNaN(spxClose) then
+        if IsNaN(trackedSPXPeak[1])
+        then spxClose
+        else Max(trackedSPXPeak[1], spxClose)
+    else trackedSPXPeak[1],
+    if !IsNaN(spxClose) then spxClose else Double.NaN
+);
+
+spxDrawdownPercent =
+    if !IsNaN(trackedSPXPeak) and trackedSPXPeak > 0 and !IsNaN(spxClose)
+    then 100 * (trackedSPXPeak - spxClose) / trackedSPXPeak
+    else Double.NaN;
+
+# The threshold must be reached before the reversal day. Once armed, the setup
+# stays armed even if the reversal close recovers above the 5% drawdown line.
+setupArmed = CompoundValue(
+    1,
+    if exitEvent or spxReversalEvent or cycleConsumed[1] == 1 then 0
+    else if !IsNaN(spxDrawdownPercent) and
+            spxDrawdownPercent >= declinePercent
+    then 1
+    else setupArmed[1],
+    0
+);
+
+spxReversalEvent =
+    isDaily and
+    inDateRange and
+    validChartBar and
+    validReferenceBar and
+    cycleConsumed[1] == 0 and
+    setupArmed[1] == 1 and
+    spxGreenReversal;
+
+rawSignal = spxReversalEvent and trendFilterOK;
+filteredSignal = spxReversalEvent and !trendFilterOK;
+
+# AddOrder always draws on the following bar. The custom position state keeps
+# calculations aligned with either the realistic next-open model or the
+# idealized signal-close model.
+longEntryEvent =
+    if executeAtClose
+    then rawSignal and position[1] == 0
+    else rawSignal[1] and position[1] == 0 and validChartBar;
+
+exitEvent =
+    position[1] == 1 and
+    barsHeld[1] >= holdingBars - 1 and
+    validChartBar;
+
+position = CompoundValue(
+    1,
+    if exitEvent then 0
+    else if longEntryEvent then 1
+    else position[1],
+    0
+);
+
+barsHeld = CompoundValue(
+    1,
+    if longEntryEvent then 0
+    else if position == 1 then barsHeld[1] + 1
+    else 0,
+    0
+);
+
+def longEntryOrder =
+    if executeAtClose
+    then longEntryEvent
+    else rawSignal and position == 0;
+def longExitOrder =
+    if executeAtClose
+    then exitEvent
+    else position == 1 and barsHeld >= holdingBars - 1;
+
+def entryOrderPrice = if executeAtClose then close else open[-1];
+def exitOrderPrice = if executeAtClose then close else open[-1];
+
+AddOrder(
+    OrderType.BUY_TO_OPEN,
+    longEntryOrder,
+    entryOrderPrice,
+    tradeSize,
+    CreateColor(0, 197, 49),
+    CreateColor(0, 197, 49),
+    "SPX reversal long"
+);
+
+AddOrder(
+    OrderType.SELL_TO_CLOSE,
+    longExitOrder,
+    exitOrderPrice,
+    tradeSize,
+    CreateColor(255, 255, 0),
+    CreateColor(255, 255, 0),
+    "Timed exit"
+);
+
+plot ChartTrendSMA =
+    if showTrendSMA then trendSMA else Double.NaN;
+ChartTrendSMA.SetDefaultColor(CreateColor(211, 211, 211));
+ChartTrendSMA.SetLineWeight(2);
+ChartTrendSMA.HideBubble();
+
+# Optional SPX state plots are off by default because SPX values and percentages
+# can distort the price scale when this strategy is applied to another symbol.
+plot SPXPeak =
+    if showSPXPeakPlot then trackedSPXPeak else Double.NaN;
+SPXPeak.SetDefaultColor(CreateColor(0, 255, 255));
+SPXPeak.SetStyle(Curve.SHORT_DASH);
+SPXPeak.SetLineWeight(2);
+SPXPeak.HideBubble();
+
+plot SPXDrawdown =
+    if showSPXDrawdownPlot then spxDrawdownPercent else Double.NaN;
+SPXDrawdown.SetDefaultColor(CreateColor(255, 95, 95));
+SPXDrawdown.SetLineWeight(2);
+SPXDrawdown.HideBubble();
+
+plot ArmedState =
+    if showArmedPlot then setupArmed else Double.NaN;
+ArmedState.SetPaintingStrategy(PaintingStrategy.HISTOGRAM);
+ArmedState.SetDefaultColor(CreateColor(255, 190, 70));
+ArmedState.SetLineWeight(3);
+ArmedState.HideBubble();
+
+plot ReversalSignal =
+    if showSignal and rawSignal
+    then low - 2 * TickSize()
+    else Double.NaN;
+ReversalSignal.SetPaintingStrategy(PaintingStrategy.ARROW_UP);
+ReversalSignal.SetDefaultColor(CreateColor(0, 197, 49));
+ReversalSignal.SetLineWeight(4);
+ReversalSignal.HideBubble();
+ReversalSignal.HideTitle();
+
+plot FilteredReversal =
+    if showFilteredSignals and filteredSignal
+    then high + 2 * TickSize()
+    else Double.NaN;
+FilteredReversal.SetPaintingStrategy(PaintingStrategy.ARROW_DOWN);
+FilteredReversal.SetDefaultColor(CreateColor(255, 95, 95));
+FilteredReversal.SetLineWeight(3);
+FilteredReversal.HideBubble();
+FilteredReversal.HideTitle();
+
+AddChartBubble(
+    showSignalBubble and rawSignal,
+    low,
+    "SPX " + AsText(Round(spxDrawdownPercent, 1)) + "% reversal",
+    CreateColor(0, 197, 49),
+    no
+);
+
+AddChartBubble(
+    showSignalBubble and showFilteredSignals and filteredSignal,
+    high,
+    if trendSMAAvailable
+    then "FILTERED: below " + trendSMALength + "d SMA"
+    else "FILTERED: " + trendSMALength + "d SMA unavailable",
+    CreateColor(255, 95, 95),
+    yes
+);
+
+# Dollar-normalized performance statistics. Automatic point value derives the
+# value of one full price point from the charted symbol's tick size and value.
+def symbolTickSize = TickSize();
+def symbolTickValue = TickValue();
+def automaticPointValue =
+    if symbolTickSize > 0 and symbolTickValue > 0
+    then symbolTickValue / symbolTickSize
+    else dollarsPerPointOverride;
+def dollarsPerPoint =
+    if useAutomaticPointValue
+    then automaticPointValue
+    else dollarsPerPointOverride;
+def slippagePerSide = slippageTicksPerSide * symbolTickSize;
+
+def unadjustedEntryPrice = if executeAtClose then close else open;
+def modeledEntryPrice = CompoundValue(
+    1,
+    if longEntryEvent
+    then unadjustedEntryPrice + slippagePerSide
+    else modeledEntryPrice[1],
+    0
+);
+
+def unadjustedExitPrice = if executeAtClose then close else open;
+def modeledExitPrice = unadjustedExitPrice - slippagePerSide;
+def roundTripCommission =
+    2 * commissionPerContractPerSide * tradeSize;
+def closedTradePL =
+    if exitEvent
+    then (modeledExitPrice - modeledEntryPrice[1]) *
+         dollarsPerPoint * tradeSize - roundTripCommission
+    else 0;
+
+def totalTrades = CompoundValue(
+    1,
+    totalTrades[1] + (if exitEvent then 1 else 0),
+    0
+);
+def winningTrades = CompoundValue(
+    1,
+    winningTrades[1] +
+        (if exitEvent and closedTradePL > 0 then 1 else 0),
+    0
+);
+def grossWins = CompoundValue(
+    1,
+    grossWins[1] +
+        (if exitEvent and closedTradePL > 0 then closedTradePL else 0),
+    0
+);
+def grossLosses = CompoundValue(
+    1,
+    grossLosses[1] +
+        (if exitEvent and closedTradePL < 0 then closedTradePL else 0),
+    0
+);
+def realizedPL = CompoundValue(
+    1,
+    realizedPL[1] + closedTradePL,
+    0
+);
+
+def openPL =
+    if position == 1
+    then (close - modeledEntryPrice) * dollarsPerPoint * tradeSize -
+         commissionPerContractPerSide * tradeSize
+    else 0;
+def equity = initialCapital + realizedPL + openPL;
+def equityPeak = CompoundValue(
+    1,
+    Max(equityPeak[1], equity),
+    initialCapital
+);
+def currentDrawdown = Max(0, equityPeak - equity);
+def currentDrawdownPercent =
+    if equityPeak > 0 then 100 * currentDrawdown / equityPeak else 0;
+def maxDrawdown = CompoundValue(
+    1,
+    Max(maxDrawdown[1], currentDrawdown),
+    0
+);
+def maxDrawdownPercent = CompoundValue(
+    1,
+    Max(maxDrawdownPercent[1], currentDrawdownPercent),
+    0
+);
+
+def winRate =
+    if totalTrades > 0 then 100 * winningTrades / totalTrades else 0;
+def averageTrade =
+    if totalTrades > 0 then realizedPL / totalTrades else 0;
+def profitFactor =
+    if grossLosses < 0
+    then grossWins / AbsValue(grossLosses)
+    else 0;
+
+AddLabel(
+    showStateLabels,
+    if position == 1 then
+        "LONG | held " + barsHeld + " of " + holdingBars
+    else if cycleConsumed == 1 then
+        "ENTRY PENDING"
+    else if setupArmed == 1 then
+        "SPX ARMED | drawdown " +
+        AsText(Round(spxDrawdownPercent, 1)) + "%"
+    else
+        "SPX TRACKING | drawdown " +
+        AsText(Round(spxDrawdownPercent, 1)) + "%",
+    if position == 1 then CreateColor(0, 197, 49)
+    else if setupArmed == 1 then CreateColor(255, 190, 70)
+    else CreateColor(128, 128, 128)
+);
+
+AddLabel(
+    showStateLabels,
+    "SPX peak " + AsText(Round(trackedSPXPeak, 2)),
+    CreateColor(211, 211, 211)
+);
+
+AddLabel(
+    showStateLabels and requireAboveTrendSMA,
+    if !trendSMAAvailable then
+        "Trend filter: " + trendSMALength + "d SMA unavailable"
+    else if close > trendSMA then
+        "Trend filter: ABOVE " + trendSMALength + "d SMA"
+    else
+        "Trend filter: BELOW " + trendSMALength + "d SMA",
+    if trendSMAAvailable and close > trendSMA
+    then CreateColor(0, 197, 49)
+    else CreateColor(255, 95, 95)
+);
+
+AddLabel(
+    showPerformanceLabels,
+    if executeAtClose then "Model: signal close" else "Model: next open",
+    if executeAtClose
+    then CreateColor(255, 190, 70)
+    else CreateColor(211, 211, 211)
+);
+AddLabel(
+    showPerformanceLabels,
+    "Trades: " + totalTrades,
+    CreateColor(211, 211, 211)
+);
+AddLabel(
+    showPerformanceLabels,
+    "Net P/L: $" + Round(realizedPL, 2),
+    if realizedPL > 0 then CreateColor(0, 197, 49)
+    else if realizedPL < 0 then CreateColor(255, 95, 95)
+    else CreateColor(128, 128, 128)
+);
+AddLabel(
+    showPerformanceLabels,
+    "Win rate: " + Round(winRate, 1) + "%",
+    CreateColor(211, 211, 211)
+);
+AddLabel(
+    showPerformanceLabels,
+    "Avg trade: $" + Round(averageTrade, 2),
+    if averageTrade > 0 then CreateColor(0, 197, 49)
+    else if averageTrade < 0 then CreateColor(255, 95, 95)
+    else CreateColor(128, 128, 128)
+);
+AddLabel(
+    showPerformanceLabels,
+    "Profit factor: " + Round(profitFactor, 2),
+    CreateColor(211, 211, 211)
+);
+AddLabel(
+    showPerformanceLabels,
+    "Max DD: $" + Round(maxDrawdown, 2) +
+    " (" + Round(maxDrawdownPercent, 1) + "%)",
+    CreateColor(255, 95, 95)
+);
+
+AddLabel(
+    !isDaily,
+    "Designed for daily bars; orders are disabled",
+    CreateColor(255, 95, 95)
+);
+AddLabel(
+    IsNaN(spxClose),
+    "No data for reference symbol " + referenceSymbol,
+    CreateColor(255, 95, 95)
+);

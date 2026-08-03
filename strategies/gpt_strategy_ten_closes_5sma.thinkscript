@@ -1,0 +1,361 @@
+# Ten Closes / 5 SMA Strategy
+#
+# Setup:
+#   - Go long after setupLength consecutive closes above the SMA.
+#   - Go short after setupLength consecutive closes below the SMA.
+#   - Signal only when the streak first reaches setupLength.
+# Exit:
+#   - Close the position holdingBars bars after entry.
+#   - Ignore all new signals while a position is open.
+#
+# Apply this strategy to a DAILY chart. To reproduce a ten-year test, set the
+# chart's time frame to 10Y:1D or enable the optional date filter below.
+
+declare upper;
+declare hide_on_intraday;
+
+input smaLength = 5;
+input setupLength = 10;
+input holdingBars = 10;
+input tradeDirection = {default both, longOnly, shortOnly};
+input executionTiming = {default nextBarOpen, signalBarClose};
+
+input tradeSize = 1;
+input useAutomaticPointValue = yes;
+input dollarsPerPointOverride = 1.0;
+input slippageTicksPerSide = 0.0;
+input commissionPerContractPerSide = 0.0;
+
+input useDateFilter = no;
+input startDate = 20160731;
+input endDate = 20991231;
+
+input showSMA = yes;
+input showSetupSignals = yes;
+input showStreakLabel = yes;
+input showPerformanceLabels = yes;
+
+Assert(smaLength > 0, "smaLength must be greater than zero");
+Assert(setupLength > 0, "setupLength must be greater than zero");
+Assert(holdingBars > 0, "holdingBars must be greater than zero");
+Assert(tradeSize > 0, "tradeSize must be greater than zero");
+Assert(dollarsPerPointOverride > 0,
+       "dollarsPerPointOverride must be greater than zero");
+Assert(slippageTicksPerSide >= 0,
+       "slippageTicksPerSide cannot be negative");
+Assert(commissionPerContractPerSide >= 0,
+       "commissionPerContractPerSide cannot be negative");
+Assert(!useDateFilter or startDate <= endDate,
+       "startDate must be before or equal to endDate");
+
+def average = Average(close, smaLength);
+def hasSMA = !IsNaN(average);
+def isAbove = hasSMA and close > average;
+def isBelow = hasSMA and close < average;
+
+def aboveStreak = CompoundValue(
+    1,
+    if isAbove then aboveStreak[1] + 1 else 0,
+    0
+);
+def belowStreak = CompoundValue(
+    1,
+    if isBelow then belowStreak[1] + 1 else 0,
+    0
+);
+
+def inDateRange =
+    !useDateFilter or
+    (GetYYYYMMDD() >= startDate and GetYYYYMMDD() <= endDate);
+def allowLong =
+    tradeDirection == tradeDirection.both or
+    tradeDirection == tradeDirection.longOnly;
+def allowShort =
+    tradeDirection == tradeDirection.both or
+    tradeDirection == tradeDirection.shortOnly;
+
+# Equality deliberately makes this a one-time signal on the tenth bar. A trend
+# that remains on the same side of the SMA does not generate another signal.
+def rawLongSignal =
+    inDateRange and allowLong and aboveStreak == setupLength;
+def rawShortSignal =
+    inDateRange and allowShort and belowStreak == setupLength;
+
+def executeAtClose =
+    executionTiming == executionTiming.signalBarClose;
+
+# Custom position state keeps the performance labels aligned with the selected
+# fill model. AddOrder itself places an order marker on the following bar, even
+# when signalBarClose is selected and the signal bar's close is used as price.
+def position;
+def barsHeld;
+
+def longEntryEvent =
+    if executeAtClose
+    then rawLongSignal and position[1] == 0
+    else rawLongSignal[1] and position[1] == 0;
+def shortEntryEvent =
+    if executeAtClose
+    then rawShortSignal and position[1] == 0
+    else rawShortSignal[1] and position[1] == 0;
+
+def exitEvent =
+    position[1] != 0 and barsHeld[1] >= holdingBars - 1;
+
+position = CompoundValue(
+    1,
+    if exitEvent then 0
+    else if longEntryEvent then 1
+    else if shortEntryEvent then -1
+    else position[1],
+    0
+);
+
+barsHeld = CompoundValue(
+    1,
+    if longEntryEvent or shortEntryEvent then 0
+    else if position != 0 then barsHeld[1] + 1
+    else 0,
+    0
+);
+
+# In the realistic default model, signals are evaluated at the close and filled
+# at the next bar's open. The alternate model prices both entries and exits at
+# the current signal bar's close to match the stated rules literally.
+def longEntryOrder =
+    if executeAtClose
+    then longEntryEvent
+    else rawLongSignal and position == 0;
+def shortEntryOrder =
+    if executeAtClose
+    then shortEntryEvent
+    else rawShortSignal and position == 0;
+def longExitOrder =
+    if executeAtClose
+    then exitEvent and position[1] == 1
+    else position == 1 and barsHeld >= holdingBars - 1;
+def shortExitOrder =
+    if executeAtClose
+    then exitEvent and position[1] == -1
+    else position == -1 and barsHeld >= holdingBars - 1;
+
+def entryOrderPrice = if executeAtClose then close else open[-1];
+def exitOrderPrice = if executeAtClose then close else open[-1];
+
+AddOrder(
+    OrderType.BUY_TO_OPEN,
+    longEntryOrder,
+    entryOrderPrice,
+    tradeSize,
+    Color.GREEN,
+    Color.GREEN,
+    "10-close long"
+);
+AddOrder(
+    OrderType.SELL_TO_CLOSE,
+    longExitOrder,
+    exitOrderPrice,
+    tradeSize,
+    Color.YELLOW,
+    Color.YELLOW,
+    "Timed long exit"
+);
+AddOrder(
+    OrderType.SELL_TO_OPEN,
+    shortEntryOrder,
+    entryOrderPrice,
+    tradeSize,
+    Color.RED,
+    Color.RED,
+    "10-close short"
+);
+AddOrder(
+    OrderType.BUY_TO_CLOSE,
+    shortExitOrder,
+    exitOrderPrice,
+    tradeSize,
+    Color.YELLOW,
+    Color.YELLOW,
+    "Timed short exit"
+);
+
+plot SMA = if showSMA then average else Double.NaN;
+SMA.SetDefaultColor(Color.CYAN);
+SMA.SetLineWeight(2);
+SMA.HideBubble();
+
+plot LongSetup =
+    if showSetupSignals and rawLongSignal
+    then low - 2 * TickSize()
+    else Double.NaN;
+LongSetup.SetPaintingStrategy(PaintingStrategy.ARROW_UP);
+LongSetup.SetDefaultColor(Color.GREEN);
+LongSetup.SetLineWeight(3);
+LongSetup.HideBubble();
+LongSetup.HideTitle();
+
+plot ShortSetup =
+    if showSetupSignals and rawShortSignal
+    then high + 2 * TickSize()
+    else Double.NaN;
+ShortSetup.SetPaintingStrategy(PaintingStrategy.ARROW_DOWN);
+ShortSetup.SetDefaultColor(Color.RED);
+ShortSetup.SetLineWeight(3);
+ShortSetup.HideBubble();
+ShortSetup.HideTitle();
+
+# Dollar-normalized performance statistics. Automatic point value derives the
+# value of a full price point from the symbol's minimum tick and tick value.
+def symbolTickSize = TickSize();
+def symbolTickValue = TickValue();
+def automaticPointValue =
+    if symbolTickSize > 0 and symbolTickValue > 0
+    then symbolTickValue / symbolTickSize
+    else dollarsPerPointOverride;
+def dollarsPerPoint =
+    if useAutomaticPointValue
+    then automaticPointValue
+    else dollarsPerPointOverride;
+def slippagePerSide = slippageTicksPerSide * symbolTickSize;
+
+def unadjustedEntryPrice = if executeAtClose then close else open;
+def modeledEntryPrice = CompoundValue(
+    1,
+    if longEntryEvent then unadjustedEntryPrice + slippagePerSide
+    else if shortEntryEvent then unadjustedEntryPrice - slippagePerSide
+    else modeledEntryPrice[1],
+    0
+);
+
+def unadjustedExitPrice = if executeAtClose then close else open;
+def modeledExitPrice =
+    if position[1] == 1
+    then unadjustedExitPrice - slippagePerSide
+    else unadjustedExitPrice + slippagePerSide;
+def roundTripCommission =
+    2 * commissionPerContractPerSide * tradeSize;
+def closedTradePL =
+    if !exitEvent then 0
+    else if position[1] == 1
+    then (modeledExitPrice - modeledEntryPrice[1]) *
+         dollarsPerPoint * tradeSize - roundTripCommission
+    else (modeledEntryPrice[1] - modeledExitPrice) *
+         dollarsPerPoint * tradeSize - roundTripCommission;
+
+def totalTrades = CompoundValue(
+    1,
+    totalTrades[1] + (if exitEvent then 1 else 0),
+    0
+);
+def winningTrades = CompoundValue(
+    1,
+    winningTrades[1] +
+        (if exitEvent and closedTradePL > 0 then 1 else 0),
+    0
+);
+def losingTrades = CompoundValue(
+    1,
+    losingTrades[1] +
+        (if exitEvent and closedTradePL < 0 then 1 else 0),
+    0
+);
+def grossWins = CompoundValue(
+    1,
+    grossWins[1] +
+        (if exitEvent and closedTradePL > 0 then closedTradePL else 0),
+    0
+);
+def grossLosses = CompoundValue(
+    1,
+    grossLosses[1] +
+        (if exitEvent and closedTradePL < 0 then closedTradePL else 0),
+    0
+);
+def realizedPL = CompoundValue(
+    1,
+    realizedPL[1] + closedTradePL,
+    0
+);
+
+def openPL =
+    if position == 1
+    then (close - modeledEntryPrice) * dollarsPerPoint * tradeSize -
+         commissionPerContractPerSide * tradeSize
+    else if position == -1
+    then (modeledEntryPrice - close) * dollarsPerPoint * tradeSize -
+         commissionPerContractPerSide * tradeSize
+    else 0;
+def cumulativePL = realizedPL + openPL;
+def equityPeak = CompoundValue(1, Max(equityPeak[1], cumulativePL), 0);
+def currentDrawdown = Max(0, equityPeak - cumulativePL);
+def maxDrawdown = CompoundValue(
+    1,
+    Max(maxDrawdown[1], currentDrawdown),
+    0
+);
+
+def winRate =
+    if totalTrades > 0 then 100 * winningTrades / totalTrades else 0;
+def averageTrade =
+    if totalTrades > 0 then realizedPL / totalTrades else 0;
+def profitFactor =
+    if grossLosses < 0 then grossWins / AbsValue(grossLosses) else 0;
+
+AddLabel(
+    showStreakLabel,
+    if isAbove then "Above-SMA streak: " + aboveStreak
+    else if isBelow then "Below-SMA streak: " + belowStreak
+    else "SMA streak: 0",
+    if isAbove then Color.GREEN
+    else if isBelow then Color.RED
+    else Color.GRAY
+);
+AddLabel(
+    showPerformanceLabels,
+    if executeAtClose then "Model: signal close" else "Model: next open",
+    if executeAtClose then Color.YELLOW else Color.LIGHT_GRAY
+);
+AddLabel(
+    showPerformanceLabels,
+    "Point value: $" + Round(dollarsPerPoint, 2),
+    Color.LIGHT_GRAY
+);
+AddLabel(
+    showPerformanceLabels,
+    "Trades: " + totalTrades,
+    Color.LIGHT_GRAY
+);
+AddLabel(
+    showPerformanceLabels,
+    "Net P/L: $" + Round(realizedPL, 2),
+    if realizedPL > 0 then Color.GREEN
+    else if realizedPL < 0 then Color.RED
+    else Color.GRAY
+);
+AddLabel(
+    showPerformanceLabels,
+    "Win rate: " + Round(winRate, 1) + "%",
+    Color.LIGHT_GRAY
+);
+AddLabel(
+    showPerformanceLabels,
+    "Avg trade: $" + Round(averageTrade, 2),
+    if averageTrade > 0 then Color.GREEN
+    else if averageTrade < 0 then Color.RED
+    else Color.GRAY
+);
+AddLabel(
+    showPerformanceLabels,
+    "Profit factor: " + Round(profitFactor, 2),
+    Color.LIGHT_GRAY
+);
+AddLabel(
+    showPerformanceLabels,
+    "Max DD: $" + Round(maxDrawdown, 2),
+    Color.RED
+);
+AddLabel(
+    GetAggregationPeriod() != AggregationPeriod.DAY,
+    "Designed for daily bars",
+    Color.YELLOW
+);
