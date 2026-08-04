@@ -1,0 +1,515 @@
+//@version=6
+indicator("Stockbee Screener", overlay=true, max_bars_back=500)
+
+// ===== ENTRY MA INPUT =====
+// MA period for the ATR-daylight entry threshold (former DAMA Y parameter; DAMA filter removed).
+entryMaPeriod = input.int(70, "Entry MA Period", minval=1, maxval=499, group="Entry Settings", tooltip="MA period for the ATR-daylight entry threshold. MA70 is default.")
+
+// ===== ENTRY THRESHOLD SETTINGS =====
+// ATR-based Daylight Threshold (calibrated optimal: 2.0x ATR)
+atrMultiple = input.float(2.0, "ATR Multiple", minval=0.5, maxval=10, step=0.5, group="Entry Settings", tooltip="Price must be >= X * ATR above MA to enter. Calibrated optimal: 2.0x ATR.")
+
+// ===== DIRECTIONAL INDICATOR FILTER =====
+// +DI > -DI confirms bullish trend direction
+useDIFilter = input.bool(true, "Use +DI > -DI Filter", group="DI Filter", tooltip="Require +DI > -DI for bullish trend confirmation. Reduces false signals.")
+diPeriod = input.int(14, "DI Period", minval=1, maxval=100, group="DI Filter", tooltip="Period for Directional Indicator calculation (standard: 14)")
+
+// ===== ANTS TTT (TIGHT CONSOLIDATION) FILTER =====
+// David Ryan's institutional accumulation pattern - tight consolidation setup
+useTTTFilter = input.bool(false, "Use Ants TTT Filter", group="Ants TTT", tooltip="Require tight consolidation pattern (3-bar tight range, today tight)")
+tttMinVolume = input.int(300000, "TTT Min Volume", minval=1000, group="Ants TTT", tooltip="Minimum volume in last 3 days")
+tttMinPrice = input.float(10.0, "TTT Min Price", minval=0.01, group="Ants TTT", tooltip="Minimum price")
+tttLookbackGaps = input.int(100, "TTT Gap Lookback", minval=1, maxval=499, group="Ants TTT", tooltip="Lookback period for gap detection")
+tttMaxPct3Bar = input.float(1.5, "TTT Max % 3-Bar", minval=0.1, group="Ants TTT", tooltip="Max % change over 3 bars (consolidation)")
+tttMaxPctToday = input.float(0.3, "TTT Max % Today", minval=0.01, group="Ants TTT", tooltip="Max % change today (tight range)")
+
+// ===== ANTS BULLISH (MWG - MOMENTUM WITHOUT GAPS) FILTER =====
+// Controlled momentum with no disruptive gaps
+useMWGFilter = input.bool(false, "Use Ants Bullish Filter", group="Ants Bullish", tooltip="Require momentum without gaps pattern (controlled moves)")
+mwgMinVolume = input.int(100000, "MWG Min Volume", minval=1000, group="Ants Bullish", tooltip="Minimum volume threshold")
+mwgMinVolDays = input.int(3, "MWG Volume Days", minval=1, maxval=60, group="Ants Bullish", tooltip="Days for volume check")
+mwgMinPrice = input.float(10.0, "MWG Min Price", minval=0.01, group="Ants Bullish", tooltip="Minimum price")
+mwgLookbackGaps = input.int(100, "MWG Gap Lookback", minval=1, maxval=499, group="Ants Bullish", tooltip="Lookback period for gap detection")
+mwgMaxDayPct = input.float(0.4, "MWG Max Day %", minval=0.05, group="Ants Bullish", tooltip="Max |today % change| (controlled move)")
+
+// ===== BULLISH COMBO (BMS) FILTER =====
+// Bullish momentum scanner - candle patterns with volume
+useBMSFilter = input.bool(false, "Use Bullish Combo Filter", group="Bullish Combo", tooltip="Require bullish candle pattern with volume")
+bmsMinPrice = input.float(10.0, "BMS Min Price", minval=0.01, group="Bullish Combo", tooltip="Minimum price")
+bmsMinVolCond1 = input.int(1000000, "BMS Cond1 Min Vol", minval=1000, group="Bullish Combo", tooltip="Min volume for Condition 1 (bullish candle)")
+bmsMinVolCond2 = input.int(100000, "BMS Cond2 Min Vol", minval=1000, group="Bullish Combo", tooltip="Min volume for Condition 2 (breakout)")
+bmsBreakoutPct = input.float(4.0, "BMS Breakout %", minval=0.1, group="Bullish Combo", tooltip="Breakout % for Condition 2")
+bmsPriceStablePct = input.float(2.0, "BMS Stability %", minval=0.1, group="Bullish Combo", tooltip="Prior stability % (c1/c2 ratio)")
+bmsCloseStrMin = input.float(0.70, "BMS Close Strength", minval=0.0, maxval=1.0, group="Bullish Combo", tooltip="Min close strength (close-low)/(high-low)")
+
+// ===== ATR vs MA (EXTENSION RISK) FILTER =====
+// Measures how extended price is from 50d MA in ATR units
+// Based on PEAD analysis: >= 7 ATR shows 51% retracement rate
+useAtrMaFilter = input.bool(false, "Use ATR vs MA Filter", group="ATR vs MA", tooltip="Filter stocks by extension risk. Excludes severely extended stocks.")
+atrMaThreshold = input.float(7.0, "Max ATR Extension", minval=0, maxval=20, step=0.5, group="ATR vs MA", tooltip="Maximum ATR extension allowed (0-7 = normal, 7-10 = elevated, 10+ = severe)")
+atrMaPeriod = input.int(50, "MA Period for ATR", minval=1, maxval=499, group="ATR vs MA", tooltip="Moving average period for extension calculation (standard: 50)")
+
+// ===== ADR% (AVERAGE DAILY RANGE) SETTINGS =====
+// ADR% measures volatility as the average daily range expressed as percentage of price
+adrPeriod = input.int(14, "ADR Period", minval=1, maxval=252, group="ADR%", tooltip="Period for Average Daily Range calculation (standard: 14 or 20 days)")
+
+// Display options
+showLabels = input.bool(true, "Show Info Labels", group="Display")
+
+// ===== STOCKBEE EP SCANNER — 4 Fundamental Scans =====
+// Uses array accumulation approach (same as Sue in a box) to access multiple quarters.
+// Revenue: request.financial with gaps_on, accumulate in array, index back for YoY.
+// EPS: request.earnings with gaps_on, accumulate in array, index back for YoY.
+
+// --- Revenue data ---
+float rev_raw = request.financial(syminfo.tickerid, "TOTAL_REVENUE", "FQ", gaps=barmerge.gaps_on, ignore_invalid_symbol=true, currency=currency.USD)
+bool rev_event = not na(rev_raw) and na(rev_raw[1])
+var array<float> sb_rev_quarters = array.new<float>()
+// Dedup guard: reject events < 60 days after the previous push (restatements /
+// re-emits would shift every YoY index by one slot). Quarters are ~91 days apart.
+var int sb_rev_lastEventTime = na
+
+if rev_event and (na(sb_rev_lastEventTime) or time - sb_rev_lastEventTime >= 60 * 86400000)
+    array.push(sb_rev_quarters, rev_raw)
+    sb_rev_lastEventTime := time
+    if array.size(sb_rev_quarters) > 10
+        array.shift(sb_rev_quarters)
+
+// --- EPS data ---
+float eps_raw = request.earnings(syminfo.tickerid, earnings.actual, gaps=barmerge.gaps_on, lookahead=barmerge.lookahead_off, ignore_invalid_symbol=true)
+bool eps_event = not na(eps_raw) and na(eps_raw[1])
+var array<float> sb_eps_quarters = array.new<float>()
+// Same 60-day dedup guard as revenue (see above).
+var int sb_eps_lastEventTime = na
+
+if eps_event and (na(sb_eps_lastEventTime) or time - sb_eps_lastEventTime >= 60 * 86400000)
+    array.push(sb_eps_quarters, eps_raw)
+    sb_eps_lastEventTime := time
+    if array.size(sb_eps_quarters) > 10
+        array.shift(sb_eps_quarters)
+
+// --- Market cap (for Growth/Turnaround $11B cap) ---
+float sb_shares = request.financial(syminfo.tickerid, "TOTAL_SHARES_OUTSTANDING", "FQ", ignore_invalid_symbol=true)
+float sb_mktCap = not na(sb_shares) ? sb_shares * close : na
+
+// --- 50-day avg volume in thousands ---
+float avgVol50_es = ta.sma(volume, 50)
+float avgVol50K = avgVol50_es / 1000
+
+// --- IPO date proxy: count total available bars on daily chart ---
+// TradingView doesn't expose IPO date directly. Stocks with < ~2520 daily bars
+// have been listed < 10 years. Uses last_bar_index (total loaded bars, constant
+// across all bars) — NOT per-bar bar_index, which would mark the first 2520 bars
+// of every old stock as IPO-recent. KNOWN LIMIT: if the host (chart plan / Pine
+// Screener) caps history below 2520 bars, old stocks false-positive as young;
+// also ticker changes reset TV history. Not detectable in Pine — treat the
+// Growth_Turnaround chip as unreliable on capped loads.
+bool sb_ipoWithin10y = timeframe.isdaily and last_bar_index < 2520
+
+// --- Compute revenue metrics ---
+int sb_rev_sz = array.size(sb_rev_quarters)
+
+// Revenue values by quarter (most recent = last element)
+float sb_rev_q0 = sb_rev_sz >= 1 ? array.get(sb_rev_quarters, sb_rev_sz - 1) : na  // latest Q
+float sb_rev_q1 = sb_rev_sz >= 2 ? array.get(sb_rev_quarters, sb_rev_sz - 2) : na  // 1Q ago
+float sb_rev_q2 = sb_rev_sz >= 3 ? array.get(sb_rev_quarters, sb_rev_sz - 3) : na  // 2Q ago
+float sb_rev_q3 = sb_rev_sz >= 4 ? array.get(sb_rev_quarters, sb_rev_sz - 4) : na  // 3Q ago
+float sb_rev_q4 = sb_rev_sz >= 5 ? array.get(sb_rev_quarters, sb_rev_sz - 5) : na  // 4Q ago (same Q last year)
+float sb_rev_q5 = sb_rev_sz >= 6 ? array.get(sb_rev_quarters, sb_rev_sz - 6) : na  // 5Q ago (1Q ago's YoY comp)
+
+// Sales % Chg Last Qtr (YoY: Q0 vs Q4)
+float salesGrowthPct = not na(sb_rev_q0) and not na(sb_rev_q4) and sb_rev_q4 > 0 ? ((sb_rev_q0 - sb_rev_q4) / sb_rev_q4) * 100 : na
+
+// Sales % Chg 1Q Ago (YoY: Q1 vs Q5)
+float salesGrowth1QAgo = not na(sb_rev_q1) and not na(sb_rev_q5) and sb_rev_q5 > 0 ? ((sb_rev_q1 - sb_rev_q5) / sb_rev_q5) * 100 : na
+
+// Avg Sales % Chg 2Q (average of last 2 quarterly YoY growth rates)
+// Fail-closed: requires BOTH quarters' YoY. No single-quarter fallback — scans
+// advertising a 2Q average must not pass on 1Q of evidence (short-history symbols).
+float avgSalesChg2Q = not na(salesGrowthPct) and not na(salesGrowth1QAgo) ? (salesGrowthPct + salesGrowth1QAgo) / 2 : na
+
+// Trailing 4-quarter annual sales in $M
+float annualSalesMil = na
+if not na(sb_rev_q0) and not na(sb_rev_q1) and not na(sb_rev_q2) and not na(sb_rev_q3)
+    annualSalesMil := (sb_rev_q0 + sb_rev_q1 + sb_rev_q2 + sb_rev_q3) / 1000000
+
+// --- Compute EPS metrics ---
+int sb_eps_sz = array.size(sb_eps_quarters)
+
+float sb_eps_q0 = sb_eps_sz >= 1 ? array.get(sb_eps_quarters, sb_eps_sz - 1) : na  // latest Q
+float sb_eps_q1 = sb_eps_sz >= 2 ? array.get(sb_eps_quarters, sb_eps_sz - 2) : na  // 1Q ago
+float sb_eps_q4 = sb_eps_sz >= 5 ? array.get(sb_eps_quarters, sb_eps_sz - 5) : na  // 4Q ago (same Q last year)
+float sb_eps_q5 = sb_eps_sz >= 6 ? array.get(sb_eps_quarters, sb_eps_sz - 6) : na  // 5Q ago (1Q ago's YoY comp)
+
+// EPS % Chg Last Qtr (YoY: Q0 vs Q4), using abs(prior) for negative base
+float epsChgLastQtr = not na(sb_eps_q0) and not na(sb_eps_q4) and sb_eps_q4 != 0 ? ((sb_eps_q0 - sb_eps_q4) / math.abs(sb_eps_q4)) * 100 : na
+
+// EPS % Chg 1Q Ago (YoY: Q1 vs Q5)
+float epsChg1QAgo = not na(sb_eps_q1) and not na(sb_eps_q5) and sb_eps_q5 != 0 ? ((sb_eps_q1 - sb_eps_q5) / math.abs(sb_eps_q5)) * 100 : na
+
+// --- 4 Scan Filters ---
+
+// Scan 1: Extreme Sales Growth (99S)
+bool extremeSalesPass = not na(salesGrowthPct) and salesGrowthPct >= 99 and not na(annualSalesMil) and annualSalesMil >= 25 and close >= 10 and not na(avgVol50K) and avgVol50K >= 100
+
+// Shared core for Scans 2 & 3: 39%+ sales last Q, 39%+ 2Q avg, $25M+ annual sales, $10+, 100K+ avg vol
+bool salesCoreOK = not na(salesGrowthPct) and salesGrowthPct >= 39 and not na(avgSalesChg2Q) and avgSalesChg2Q >= 39 and not na(annualSalesMil) and annualSalesMil >= 25 and close >= 10 and not na(avgVol50K) and avgVol50K >= 100
+
+// Scan 2: Sales Growth (39S/39S)
+bool salesGrowthPass = salesCoreOK
+
+// Market cap check: $11B threshold is USD — fail closed on non-USD-quoted symbols
+// (shares * close is in chart currency; revenue is forced USD but cap is not).
+bool sb_capOK = syminfo.currency == "USD" and not na(sb_mktCap) and sb_mktCap <= 11e9
+
+// Scan 3: Growth/Turnaround (small/mid-cap, IPO within 10y)
+bool growthTurnaroundPass = salesCoreOK and sb_capOK and sb_ipoWithin10y
+
+// Scan 4: Earnings + Sales Growth (39E39E)
+bool earningsSalesPass = not na(epsChgLastQtr) and epsChgLastQtr >= 39 and not na(epsChg1QAgo) and epsChg1QAgo >= 39 and not na(salesGrowthPct) and salesGrowthPct >= 20 and not na(avgSalesChg2Q) and avgSalesChg2Q >= 20 and not na(annualSalesMil) and annualSalesMil >= 25 and close >= 10 and not na(avgVol50K) and avgVol50K >= 200
+
+// ===== SHARED CALCULATIONS (computed once, reused everywhere) =====
+// Single ATR(14) calculation - reused for extension and entry
+float atr14 = ta.atr(14)
+
+// Calculate Moving Average (entry MA)
+ma = ta.sma(close, entryMaPeriod)
+
+// 21 EMA for screening
+ema21 = ta.ema(close, 21)
+isBelowEma21 = close < ema21
+
+// 10 EMA for screening
+ema10 = ta.ema(close, 10)
+isBelowEma10 = close < ema10
+
+// NOTE: DAMA (Days Above MA) and MAMA subsystems removed — unused by any Pine Screener chip.
+// The shared `ma` above is retained because the ATR-daylight entry threshold uses it.
+
+// ===== DIRECTIONAL INDICATOR CALCULATION =====
+// Calculate +DI and -DI using Wilder's method
+[plusDI, minusDI, adxValue] = ta.dmi(diPeriod, diPeriod)
+diBullish = plusDI > minusDI
+
+// Apply DI filter based on user setting
+passesDI = useDIFilter ? diBullish : true
+
+// ===== ANTS TTT (TIGHT CONSOLIDATION) CALCULATION =====
+// Volume condition: min volume in last 3 days
+ttt_minVol3d = math.min(volume[1], math.min(volume[2], volume[3]))
+ttt_volumeOK = ttt_minVol3d >= tttMinVolume
+
+// Price condition
+ttt_priceOK = close > tttMinPrice
+
+// 3-bar consolidation: |price change over 3 bars| <= threshold
+ttt_pctChange3Bar = close[3] != 0 ? ((close - close[3]) / close[3]) * 100.0 : na
+ttt_consolOK = not na(ttt_pctChange3Bar) and math.abs(ttt_pctChange3Bar) <= tttMaxPct3Bar
+
+// Today tight range: |today's change| <= threshold
+float pctChangeToday = close[1] != 0 ? ((close - close[1]) / close[1]) * 100.0 : na
+ttt_tightOK = not na(pctChangeToday) and math.abs(pctChangeToday) <= tttMaxPctToday
+
+// Gap detection: close > 1.2 × prior close AND high-low < 0.04 × close
+isGapBar = not na(close[1]) and (close > 1.2 * close[1]) and ((high - low) < 0.04 * close)
+
+// Optimized gap counting using running counter
+// Use bar_index check for booleans since na()/nz() only work with numeric types
+var int ttt_gapCount_sum = 0
+int ttt_gapOld = bar_index >= tttLookbackGaps ? (isGapBar[tttLookbackGaps] ? 1 : 0) : 0
+ttt_gapCount_sum := ttt_gapCount_sum + (isGapBar ? 1 : 0) - ttt_gapOld
+// Fail-closed: "no gaps in last N bars" is unverifiable until N bars exist.
+// Without this guard, young IPOs (exactly where gaps live) pass by default.
+ttt_noGapsOK = bar_index >= tttLookbackGaps and ttt_gapCount_sum == 0
+
+// Final TTT signal
+ttt_pass = ttt_volumeOK and ttt_priceOK and ttt_consolOK and ttt_tightOK and ttt_noGapsOK
+passesTTT = useTTTFilter ? ttt_pass : true
+
+// ===== ANTS BULLISH (MWG) CALCULATION =====
+// Momentum conditions (any one must pass)
+mwg_min30 = ta.lowest(close, 30)
+mwg_avg7 = ta.sma(close, 7)
+mwg_avg65 = ta.sma(close, 65)
+
+mwg_mom1 = close / mwg_min30 >= 1.20  // 20% above 30-day low
+mwg_mom2 = mwg_avg7 / mwg_avg65 >= 1.05  // 7-day avg 5% above 65-day avg
+mwg_momentumOK = mwg_mom1 or mwg_mom2
+
+// Price above minimum
+mwg_priceOK = close > mwgMinPrice
+
+// Optimized MWG gap counting using running counter (shares isGapBar from TTT section)
+// Use bar_index check for booleans since na()/nz() only work with numeric types
+var int mwg_gapCount_sum = 0
+int mwg_gapOld = bar_index >= mwgLookbackGaps ? (isGapBar[mwgLookbackGaps] ? 1 : 0) : 0
+mwg_gapCount_sum := mwg_gapCount_sum + (isGapBar ? 1 : 0) - mwg_gapOld
+// Fail-closed until full lookback window exists (same rationale as TTT above).
+mwg_noGapsOK = bar_index >= mwgLookbackGaps and mwg_gapCount_sum == 0
+
+// Volume condition: min volume in N days
+mwg_minVolNd = ta.lowest(volume[1], mwgMinVolDays)
+mwg_volumeOK = mwg_minVolNd >= mwgMinVolume
+
+// Controlled daily move (reuse pctChangeToday from TTT)
+mwg_controlledMove = not na(pctChangeToday) and math.abs(pctChangeToday) <= mwgMaxDayPct
+
+// Final MWG signal
+mwg_pass = mwg_momentumOK and mwg_priceOK and mwg_noGapsOK and mwg_volumeOK and mwg_controlledMove
+passesMWG = useMWGFilter ? mwg_pass : true
+
+// ===== BULLISH COMBO (BMS) CALCULATION =====
+// Condition 1: Bullish candle setup
+bms_bullishCandle = open > 0 and (close - open) / open >= 0.02  // 2% candle body
+bms_highVolume = volume > bmsMinVolCond1
+bms_continuation = math.abs(close[1] - open[1]) <= (close - open)
+bms_stability = close[2] != 0 and math.abs(close[1] / close[2] - 1.0) <= (bmsPriceStablePct / 100.0)
+bms_condition1 = bms_bullishCandle and bms_highVolume and bms_continuation and bms_stability
+
+// Condition 2: Breakout setup
+bms_breakout = close / close[1] >= (1.0 + bmsBreakoutPct / 100.0)
+bms_volumeSurge = volume > volume[1]
+bms_minVolume2 = volume >= bmsMinVolCond2
+bms_condition2 = bms_breakout and bms_volumeSurge and bms_minVolume2 and bms_stability
+
+// Common filters
+bms_priceOK = close >= bmsMinPrice
+
+// Close strength: (close - low) / (high - low)
+bms_range = high - low
+bms_closeStrength = bms_range > 0 ? (close - low) / bms_range : na
+bms_closeStrengthOK = not na(bms_closeStrength) and bms_closeStrength >= bmsCloseStrMin
+
+// Final BMS signal
+bms_pass = (bms_condition1 or bms_condition2) and bms_priceOK and bms_closeStrengthOK
+passesBMS = useBMSFilter ? bms_pass : true
+
+// ===== ATR vs MA (EXTENSION RISK) CALCULATION =====
+// Measures how extended price is from 50d MA in ATR units
+// Grey: below MA, Green: 0-7 ATR (normal), Amber: 7-10 ATR (elevated risk), Red: 10+ (severe risk)
+float ma50_atr = ta.sma(close, atrMaPeriod)
+float extensionAtr = not na(atr14) and atr14 > 0 and not na(ma50_atr) ? (close - ma50_atr) / atr14 : na
+
+// ATR vs MA risk category
+string atrMaRisk = na(extensionAtr) ? "N/A" : extensionAtr < 0 ? "Below MA" : extensionAtr < 7 ? "Normal" : extensionAtr < 10 ? "Elevated" : "Severe"
+
+// ATR vs MA filter pass (allows stocks below threshold)
+bool passesAtrMa = useAtrMaFilter ? (not na(extensionAtr) and extensionAtr <= atrMaThreshold) : true
+
+// ===== ADR% (AVERAGE DAILY RANGE PERCENTAGE) CALCULATION =====
+// ADR% = Average of (High - Low) / Close * 100 over N periods
+// Measures volatility - higher ADR% = more volatile stock
+float dailyRangePct = (high - low) / close * 100
+float adrPct = ta.sma(dailyRangePct, adrPeriod)
+
+// ===== EXTENSION FROM MA70 (Primary Extension Metric) =====
+// Extension uses a fixed MA70 (risk thresholds calibrated for MA70)
+// Based on 11,180 historical signals (directional; Wilson CI not computed):
+// Green: <6x (safe), Orange: 6-7x (elevated), Red: 7-8x (extended), Maroon: >8x (danger - negative returns)
+float ma70_fixed = ta.sma(close, 70)
+float extensionMA70 = not na(atr14) and atr14 > 0 and not na(ma70_fixed) ? (close - ma70_fixed) / atr14 : na
+
+// Extension risk category based on MA70
+string extensionRisk = na(extensionMA70) ? "N/A" : extensionMA70 < 0 ? "Below MA" : extensionMA70 < 6 ? "Safe" : extensionMA70 < 7 ? "Elevated" : extensionMA70 < 8 ? "Extended" : "Danger"
+
+// ===== TI65, 9M VOL, +4% CHANGE CALCULATIONS =====
+// TI65: Trend Intensity = avgC7 / avgC65 (reuses mwg_avg7 and mwg_avg65)
+float ti65 = mwg_avg65 > 0 ? mwg_avg7 / mwg_avg65 : na
+
+// 9M Vol: Volume >= 9,000,000 AND today's volume > yesterday's AND close up 4%+ vs yesterday
+bool is9mVol = volume >= 9000000 and volume > volume[1] and close >= 1.04 * close[1]
+
+// +4% Change: Daily gain >= +4%
+bool isPlus4PctChange = not na(pctChangeToday) and pctChangeToday >= 4.0
+
+// ===== ATRP & LONG-TERM TIGHTNESS CALCULATIONS =====
+// ATRP: Normalized ATR as percentage of price (lower = tighter)
+float atrp = (atr14 / close) * 100
+
+// ATRP Percentile: % of last 126 days with lower ATRP (0-100)
+// Low percentile = currently tighter than usual
+float atrp_percentile = ta.percentrank(atrp, 126)
+
+// LT_Tightness: Inverse of percentile scaled 0-1 (higher = tighter)
+// 1.0 = tightest it's been in 126 days, 0.0 = loosest
+float lt_tightness = (100 - atrp_percentile) / 100
+
+// TI65 normalized: Scales TI65 for reliability calculation
+// Code maps (x5): 0.95->0, 1.00->0.25, 1.05->0.50, 1.10->0.75, 1.15->1.0 (saturates).
+// NOTE: an earlier comment implied x2 — verify intended slope before relying on Reliability.
+float ti65_normalized = math.min(1.0, math.max(0, (ti65 - 0.95)) * 5)
+
+// Reliability Score: Combines trend strength with tightness
+// High reliability = strong uptrend + tight/controlled movement
+float reliability = ti65_normalized * lt_tightness
+
+// ===== BOLLINGER BAND WIDTH TIGHTNESS (Alternative Method) =====
+// BBW: Bollinger Band Width as percentage of middle band
+float bb_middle = ta.sma(close, 20)
+float bb_std = ta.stdev(close, 20)
+float bbw = (4 * bb_std / bb_middle) * 100
+
+// BBW Percentile: % of last 126 days with lower BBW (0-100)
+// Low percentile = currently tighter than usual (squeeze)
+float bbw_percentile = ta.percentrank(bbw, 126)
+
+// BBW Tightness: Inverse of percentile scaled 0-1 (higher = tighter)
+float bbw_tightness = (100 - bbw_percentile) / 100
+
+// Reliability_v2: Uses BBW instead of ATRP for tightness
+float reliability_v2 = ti65_normalized * bbw_tightness
+
+// ===== SHORT-TERM TIGHTNESS CONFIRMATION (20-Day Lookback) =====
+// Purpose: Verify that a stock with high 126-day reliability is CURRENTLY actionable
+// Prevents buying stocks that were reliable but are now loosening up
+
+// ATRP-based 20-day tightness (for v1 confirmation)
+float atrp_pctl_20 = ta.percentrank(atrp, 20)
+float tightness_20 = (100 - atrp_pctl_20) / 100
+
+// BBW-based 20-day tightness (for v2 confirmation)
+float bbw_pctl_20 = ta.percentrank(bbw, 20)
+float bbw_tightness_20 = (100 - bbw_pctl_20) / 100
+
+// Status categories for display
+// CONFIRMED: High reliability + currently tight (actionable)
+// CAUTION: High reliability but loosening (was reliable, now erratic)
+// EMERGING: Low reliability but currently tight (potential early stage)
+// AVOID: Low reliability + currently loose (no signal)
+// N/A guard: <126 bars of history → percentrank is na → reliability is na; without
+// the guard a fresh IPO would display a confident "AVOID" computed from no data.
+string rel_status = na(reliability) or na(tightness_20) ? "N/A" : reliability >= 0.12 ? (tightness_20 >= 0.50 ? "CONFIRMED" : "CAUTION") : (tightness_20 >= 0.50 ? "EMERGING" : "AVOID")
+string rel_v2_status = na(reliability_v2) or na(bbw_tightness_20) ? "N/A" : reliability_v2 >= 0.12 ? (bbw_tightness_20 >= 0.50 ? "CONFIRMED" : "CAUTION") : (bbw_tightness_20 >= 0.50 ? "EMERGING" : "AVOID")
+
+// ===== ENTRY & EXIT SIGNALS =====
+// Daylight indicator
+daylightPercent = ((close - ma) / ma) * 100
+
+// ATR-based threshold: Price must be >= ATR multiple above MA (reuse atr14)
+atrThreshold = atrMultiple * atr14
+entryThresholdPrice = ma + atrThreshold
+entryThresholdPct = (atrThreshold / ma) * 100  // For display purposes
+
+// Entry condition: Price >= MA + (ATR multiple * ATR) AND passes all enabled filters
+optimalEntry = close >= entryThresholdPrice and passesDI and passesTTT and passesMWG and passesBMS and passesAtrMa
+
+// EXIT SIGNAL: 10-day MA violated for 3+ consecutive days
+ma10 = ta.sma(close, 10)
+isBelow10MA = close < ma10
+
+// Count consecutive days below 10-day MA
+var int consecutiveDaysBelow10MA = 0
+if isBelow10MA
+    consecutiveDaysBelow10MA := consecutiveDaysBelow10MA + 1
+else
+    consecutiveDaysBelow10MA := 0
+
+// Exit signal triggered when 3+ consecutive days below 10-day MA
+exitSignal = consecutiveDaysBelow10MA >= 3
+
+// ===== PLOTS FOR PINE SCREENER =====
+// SCREENER CHIPS (display.data_window) - Pine Screener data-window only, off-chart (order = priority)
+// Stockbee EP Scanner chips
+// 1-4: Stockbee EP Scanner chips
+plot(growthTurnaroundPass ? 1 : 0, "Growth_Turnaround", display=display.data_window)  // Bucket 0: 39%+ sales, $11B cap, IPO <10y
+plot(salesGrowthPass ? 1 : 0, "Sales_Growth", display=display.data_window)  // Bucket 1: 39%+ sales last Q + 2Q avg
+plot(extremeSalesPass ? 1 : 0, "Extreme_Sales", display=display.data_window)  // Bucket 2: 99%+ sales last Q
+plot(earningsSalesPass ? 1 : 0, "Earnings_Sales", display=display.data_window)  // Bucket 3: 39%+ EPS (2Q) + 20%+ sales
+// 5-7: Ants pattern chips
+plot(ttt_pass ? 1 : 0, "Ants TTT", display=display.data_window)  // Tight consolidation pattern
+plot(mwg_pass ? 1 : 0, "Ants Bullish", display=display.data_window)
+plot(bms_pass ? 1 : 0, "Bullish Combo", display=display.data_window)
+// 8-14: Trend, momentum & volume chips
+plot(ti65, "TI65", display=display.data_window)  // Trend Intensity: avgC7/avgC65 (>1.0 = bullish momentum)
+plot(adxValue, "ADX", display=display.data_window)  // Average Directional Index - trend strength (>25 = strong trend)
+plot(diBullish ? 1 : 0, "DI", display=display.data_window)  // Directional Indicator: 1 = +DI > -DI (bullish), 0 = bearish
+plot(isBelowEma10 ? 1 : 0, "Below_10EMA", display=display.data_window)
+plot(isBelowEma21 ? 1 : 0, "Below_21EMA", display=display.data_window)
+plot(is9mVol ? 1 : 0, "9M_Vol", display=display.data_window)  // High volume flag: volume >= 9,000,000
+plot(isPlus4PctChange ? 1 : 0, "Plus_4Pct_Change", display=display.data_window)  // Big move flag: daily gain >= +4%
+
+// Background color for optimal entry zone
+bgcolor(optimalEntry ? color.new(color.lime, 95) : na, title="Optimal Entry Zone")
+
+// Background color for exit signal warning
+bgcolor(exitSignal ? color.new(color.red, 92) : na, title="Exit Signal Warning")
+
+// Plot visual indicators
+
+// Entry signal indicator
+plotshape(optimalEntry and not optimalEntry[1], "Entry Signal", shape.circle, location.belowbar,
+         color.lime, size=size.small, text="ENTRY")
+
+// Exit signal indicator
+plotshape(exitSignal and not exitSignal[1], "Exit Warning", shape.xcross, location.abovebar,
+         color.red, size=size.normal, text="EXIT")
+
+// Create info label
+var label infoLabel = na
+if showLabels and barstate.islast
+    label.delete(infoLabel)
+
+    // Build Ants status string
+    string antsText = ""
+    if useTTTFilter or useMWGFilter or useBMSFilter
+        antsText := "-------------\nAnts Patterns:\n"
+        if useTTTFilter
+            antsText := antsText + "  TTT: " + (ttt_pass ? "PASS" : "FAIL") + "\n"
+        if useMWGFilter
+            antsText := antsText + "  MWG: " + (mwg_pass ? "PASS" : "FAIL") + "\n"
+        if useBMSFilter
+            antsText := antsText + "  BMS: " + (bms_pass ? "PASS" : "FAIL") + "\n"
+
+    // Build ATR vs MA status string
+    string atrMaStatusText = na(extensionAtr) ? "N/A" : str.tostring(extensionAtr, "#.##") + " (" + atrMaRisk + ")"
+    string atrMaFilterText = useAtrMaFilter ? (passesAtrMa ? " PASS" : " FAIL") : ""
+
+    // Build Extension MA70 status string
+    string extMA70Text = na(extensionMA70) ? "N/A" : str.tostring(extensionMA70, "#.#") + "x ATR (" + extensionRisk + ")"
+
+    // Build TI65/9MVol/+4% status
+    string ti65Text = str.tostring(ti65, "#.###")
+    string vol9mText = is9mVol ? "YES (" + str.tostring(volume / 1000000, "#.#") + "M)" : "No"
+    // Explicit sign prefix: "+#.#" format renders negatives as "+-2.3" in Pine.
+    string change4pctText = isPlus4PctChange ? "YES (+" + str.tostring(pctChangeToday, "#.#") + "%)" : na(pctChangeToday) ? "N/A" : (pctChangeToday >= 0 ? "+" : "") + str.tostring(pctChangeToday, "#.#") + "%"
+
+    string labelText = "MA Period: " + str.tostring(entryMaPeriod) + "-day\n" +
+                 "-------------\n" +
+                 "TI65: " + ti65Text + "\n" +
+                 "9M Vol: " + vol9mText + "\n" +
+                 "+4% Change: " + change4pctText + "\n" +
+                 "-------------\n" +
+                 "=== RELIABILITY v1 (ATRP) ===\n" +
+                 "ATRP: " + str.tostring(atrp, "#.##") + "% (Pctl: " + str.tostring(atrp_percentile, "#") + ")\n" +
+                 "LT Tightness (126d): " + str.tostring(lt_tightness, "#.##") + (lt_tightness > 0.7 ? " TIGHT" : lt_tightness > 0.4 ? " MOD" : " LOOSE") + "\n" +
+                 "ST Tightness (20d): " + str.tostring(tightness_20, "#.##") + (tightness_20 > 0.7 ? " TIGHT" : tightness_20 > 0.4 ? " MOD" : " LOOSE") + "\n" +
+                 "Reliability: " + str.tostring(reliability, "#.###") + " [" + rel_status + "]\n" +
+                 "-------------\n" +
+                 "=== RELIABILITY v2 (BBW) ===\n" +
+                 "BBW: " + str.tostring(bbw, "#.##") + "% (Pctl: " + str.tostring(bbw_percentile, "#") + ")\n" +
+                 "LT Tightness (126d): " + str.tostring(bbw_tightness, "#.##") + (bbw_tightness > 0.7 ? " TIGHT" : bbw_tightness > 0.4 ? " MOD" : " LOOSE") + "\n" +
+                 "ST Tightness (20d): " + str.tostring(bbw_tightness_20, "#.##") + (bbw_tightness_20 > 0.7 ? " TIGHT" : bbw_tightness_20 > 0.4 ? " MOD" : " LOOSE") + "\n" +
+                 "Reliability_v2: " + str.tostring(reliability_v2, "#.###") + " [" + rel_v2_status + "]\n" +
+                 "-------------\n" +
+                 "DI Filter: " + (diBullish ? "+DI > -DI BULLISH" : "+DI < -DI BEARISH") + "\n" +
+                 "ADR%: " + str.tostring(adrPct, "#.##") + "%\n" +
+                 "Extension (MA70): " + extMA70Text + "\n" +
+                 "ATR vs MA (" + str.tostring(atrMaPeriod) + "d): " + atrMaStatusText + atrMaFilterText + "\n" +
+                 antsText +
+                 "Entry Threshold: " + str.tostring(atrMultiple, "#.#") + "x ATR (" + str.tostring(entryThresholdPct, "#.#") + "%)\n" +
+                 "Daylight: " + str.tostring(daylightPercent, "#.#") + "% " + (optimalEntry ? "OPTIMAL" : "") + "\n" +
+                 "Exit Signal: " + (exitSignal ? "EXIT (" + str.tostring(consecutiveDaysBelow10MA) + "d)" : "HOLD")
+
+    color labelColor = optimalEntry ? color.new(color.green, 20) : color.new(color.gray, 20)
+
+    infoLabel := label.new(bar_index, high, labelText,
+                          style=label.style_label_down,
+                          color=labelColor,
+                          textcolor=color.white,
+                          size=size.normal)
+
+// Alert conditions
+// Entry & Exit alerts
+alertcondition(optimalEntry and not optimalEntry[1], "Optimal Entry Zone", "{{ticker}} entered OPTIMAL ENTRY ZONE at {{close}}")
+alertcondition(exitSignal and not exitSignal[1], "Exit Signal Triggered", "{{ticker}} EXIT SIGNAL - Price below MA10 for 3+ days at {{close}}")
+
