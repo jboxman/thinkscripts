@@ -1,0 +1,216 @@
+# AGAIG ORB + VWAP + Repainting Swing Bubbles
+#
+# A focused bundle assembled from:
+# - shared_AGAIG_ORB_NoCloud_Lines_Labels
+# - shared_AGAIG_VWAP_AUTO
+# - shared_AsGoodAsItGets_Indicator / shared_AGAIG_TrendArrows
+#
+# IMPORTANT:
+# The LONG/SHORT markers use ZigZagHighLow. The newest ZigZag pivot is
+# retrospective and can move or disappear as later bars arrive. These are
+# swing annotations for visual review, not non-repainting entry signals.
+#
+# ORB is intended for intraday charts whose aggregation is no greater than
+# the selected opening-range aggregation. ThinkOrSwim session times are ET.
+
+declare upper;
+
+# ----------------------------------------------------------------------
+# Display
+# ----------------------------------------------------------------------
+
+input labelSize = FontSize.MEDIUM;
+input labelLocation = Location.TOP_LEFT;
+input showRepaintWarning = yes;
+
+# ----------------------------------------------------------------------
+# VWAP
+# ----------------------------------------------------------------------
+
+input showVWAP = yes;
+input showVWAPLabel = yes;
+input vwapTimeFrame = {default DAY, WEEK, MONTH};
+
+def selectedVWAP = Reference VWAP(timeFrame = vwapTimeFrame).price;
+
+plot VWAPLine =
+    if showVWAP then selectedVWAP else Double.NaN;
+VWAPLine.SetDefaultColor(Color.YELLOW);
+VWAPLine.SetLineWeight(2);
+VWAPLine.HideBubble();
+VWAPLine.HideTitle();
+
+AddLabel(
+    showVWAPLabel and !IsNaN(selectedVWAP),
+    if close > selectedVWAP then "Above VWAP"
+    else if close < selectedVWAP then "Below VWAP"
+    else "At VWAP",
+    if close > selectedVWAP then Color.GREEN
+    else if close < selectedVWAP then Color.RED
+    else Color.YELLOW,
+    labelLocation,
+    labelSize
+);
+
+# ----------------------------------------------------------------------
+# Opening range
+# ----------------------------------------------------------------------
+
+input showORB = yes;
+input showORBLabel = yes;
+input showORBBubbles = yes;
+input orbTime = AggregationPeriod.FIFTEEN_MIN;
+input sessionStart = 0930;
+input sessionEnd = 1600;
+
+def orbMinutes = orbTime / 60000;
+def secondsFromOpen = SecondsFromTime(sessionStart);
+def inRegularSession =
+    secondsFromOpen >= 0 and SecondsTillTime(sessionEnd) > 0;
+def inOpeningRange =
+    secondsFromOpen >= 0 and secondsFromOpen < orbMinutes * 60;
+
+def openingAggregationHigh = high(period = orbTime);
+def openingAggregationLow = low(period = orbTime);
+
+def openingRangeHigh =
+    if !inRegularSession then Double.NaN
+    else if inOpeningRange then openingAggregationHigh
+    else openingRangeHigh[1];
+
+def openingRangeLow =
+    if !inRegularSession then Double.NaN
+    else if inOpeningRange then openingAggregationLow
+    else openingRangeLow[1];
+
+plot ORBHighDeveloping =
+    if showORB and inOpeningRange then openingRangeHigh else Double.NaN;
+plot ORBLowDeveloping =
+    if showORB and inOpeningRange then openingRangeLow else Double.NaN;
+ORBHighDeveloping.SetPaintingStrategy(PaintingStrategy.DASHES);
+ORBLowDeveloping.SetPaintingStrategy(PaintingStrategy.DASHES);
+ORBHighDeveloping.SetDefaultColor(Color.YELLOW);
+ORBLowDeveloping.SetDefaultColor(Color.YELLOW);
+ORBHighDeveloping.HideBubble();
+ORBLowDeveloping.HideBubble();
+ORBHighDeveloping.HideTitle();
+ORBLowDeveloping.HideTitle();
+
+plot ORBHigh =
+    if showORB and inRegularSession and !inOpeningRange
+    then openingRangeHigh
+    else Double.NaN;
+plot ORBLow =
+    if showORB and inRegularSession and !inOpeningRange
+    then openingRangeLow
+    else Double.NaN;
+ORBHigh.SetDefaultColor(Color.YELLOW);
+ORBLow.SetDefaultColor(Color.YELLOW);
+ORBHigh.SetLineWeight(2);
+ORBLow.SetLineWeight(2);
+ORBHigh.HideBubble();
+ORBLow.HideBubble();
+
+AddLabel(
+    showORBLabel and inRegularSession and !inOpeningRange,
+    if close > openingRangeHigh then "Above ORB"
+    else if close < openingRangeLow then "Below ORB"
+    else "Inside ORB",
+    if close > openingRangeHigh then Color.GREEN
+    else if close < openingRangeLow then Color.RED
+    else Color.YELLOW,
+    labelLocation,
+    labelSize
+);
+
+def lastRealBar = !IsNaN(close) and IsNaN(close[-1]);
+
+AddChartBubble(
+    showORB and showORBBubbles and lastRealBar and !IsNaN(ORBHigh),
+    ORBHigh,
+    "ORB HI",
+    Color.YELLOW,
+    yes
+);
+AddChartBubble(
+    showORB and showORBBubbles and lastRealBar and !IsNaN(ORBLow),
+    ORBLow,
+    "ORB LO",
+    Color.YELLOW,
+    no
+);
+
+# ----------------------------------------------------------------------
+# Repainting ZigZag swing markers
+# ----------------------------------------------------------------------
+
+input showSwingArrows = yes;
+input showSwingBubbles = yes;
+input atrReversal = 2.0;
+input zigZagEMALength = 5;
+input zigZagPercentageReversal = 0.01;
+input zigZagAbsoluteReversal = 0.05;
+input zigZagATRLength = 5;
+
+def smoothedHigh =
+    MovingAverage(AverageType.EXPONENTIAL, high, zigZagEMALength);
+def smoothedLow =
+    MovingAverage(AverageType.EXPONENTIAL, low, zigZagEMALength);
+
+def swingLow = ZigZagHighLow(
+    "price h" = smoothedHigh,
+    "price l" = smoothedLow,
+    "percentage reversal" = zigZagPercentageReversal,
+    "absolute reversal" = zigZagAbsoluteReversal,
+    "atr length" = zigZagATRLength,
+    "atr reversal" = atrReversal
+).lastL;
+
+def swingHigh = ZigZagHighLow(
+    "price h" = smoothedHigh,
+    "price l" = smoothedLow,
+    "percentage reversal" = zigZagPercentageReversal,
+    "absolute reversal" = zigZagAbsoluteReversal,
+    "atr length" = zigZagATRLength,
+    "atr reversal" = atrReversal
+).lastH;
+
+def longSwing = !IsNaN(swingLow);
+def shortSwing = !IsNaN(swingHigh);
+
+plot LongArrow = showSwingArrows and longSwing;
+LongArrow.SetPaintingStrategy(PaintingStrategy.BOOLEAN_ARROW_UP);
+LongArrow.SetDefaultColor(Color.GREEN);
+LongArrow.SetLineWeight(4);
+LongArrow.HideBubble();
+LongArrow.HideTitle();
+
+plot ShortArrow = showSwingArrows and shortSwing;
+ShortArrow.SetPaintingStrategy(PaintingStrategy.BOOLEAN_ARROW_DOWN);
+ShortArrow.SetDefaultColor(Color.RED);
+ShortArrow.SetLineWeight(4);
+ShortArrow.HideBubble();
+ShortArrow.HideTitle();
+
+AddChartBubble(
+    showSwingBubbles and longSwing,
+    low,
+    "LONG",
+    Color.GREEN,
+    yes
+);
+AddChartBubble(
+    showSwingBubbles and shortSwing,
+    high,
+    "SHORT",
+    Color.RED,
+    no
+);
+
+AddLabel(
+    showRepaintWarning and (showSwingArrows or showSwingBubbles),
+    "ZigZag LONG/SHORT repaint",
+    Color.ORANGE,
+    labelLocation,
+    labelSize
+);
