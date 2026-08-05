@@ -1,0 +1,530 @@
+# Normalized McClellan Breadth-Repair Strategy
+#
+# Setup:
+#   - Arm after the normalized McClellan Oscillator (MCO) closes at or below
+#     mcoArmLevel standard deviations below zero.
+#   - Buy the charted security on the first later McClellan Summation Index
+#     (MCSI) confirmation selected by confirmationType.
+#   - Optionally require the charted security to close above its trend SMA.
+# Exit:
+#   - Close the position holdingBars chart sessions after entry.
+#   - Ignore new breadth setups while the position is open. A filtered MCSI
+#     confirmation consumes the current setup; a new MCO stretch must re-arm it.
+#
+# Apply this strategy to a DAILY chart. Breadth internals supply the setup; all
+# orders and performance statistics use the charted security.
+
+declare upper;
+declare hide_on_intraday;
+
+input exchange = {NYSE, NASDAQ, AMEX, default NASDAQ_100, SP_500, RUSSELL_2000, ALL_US};
+input fastLength = 19;
+input slowLength = 39;
+input ratioAdjusted = no;
+input isCumulative = yes;
+input mcoNormalization = {default ZERO_CENTERED_SIGMA, Z_SCORE};
+input mcoSigmaLength = 63;
+input mcsiAverageLength = 10;
+input mcsiAverageType = AverageType.SIMPLE;
+input mcsiSigmaLength = 63;
+
+input mcoArmLevel = 1.0;
+input confirmationType = {default MCSI_CURL_UP, MCSI_MA_RECLAIM, EITHER};
+input holdingBars = 10;
+input executionTiming = {default nextBarOpen, signalBarClose};
+input requireAboveTrendSMA = yes;
+input trendSMALength = 200;
+
+input tradeSize = 1;
+input initialCapital = 100000.0;
+input useAutomaticPointValue = yes;
+input dollarsPerPointOverride = 1.0;
+input slippageTicksPerSide = 0.0;
+input commissionPerContractPerSide = 0.0;
+
+input useDateFilter = no;
+input startDate = 20100101;
+input endDate = 20991231;
+
+input showSignal = yes;
+input showSignalBubble = yes;
+input showFilteredSignals = yes;
+input showTrendSMA = yes;
+input showPerformanceLabels = yes;
+input showStateLabels = yes;
+input showMCOScorePlot = no;
+input showMCSIScorePlot = no;
+input showArmedPlot = no;
+
+Assert(fastLength > 0, "fastLength must be greater than zero");
+Assert(slowLength > fastLength, "slowLength must exceed fastLength");
+Assert(mcoSigmaLength > 1, "mcoSigmaLength must be greater than one");
+Assert(mcsiAverageLength > 1,
+       "mcsiAverageLength must be greater than one");
+Assert(mcsiSigmaLength > 1, "mcsiSigmaLength must be greater than one");
+Assert(mcoArmLevel > 0, "mcoArmLevel must be greater than zero");
+Assert(holdingBars > 0, "holdingBars must be greater than zero");
+Assert(trendSMALength > 0, "trendSMALength must be greater than zero");
+Assert(tradeSize > 0, "tradeSize must be greater than zero");
+Assert(initialCapital > 0, "initialCapital must be greater than zero");
+Assert(dollarsPerPointOverride > 0,
+       "dollarsPerPointOverride must be greater than zero");
+Assert(slippageTicksPerSide >= 0,
+       "slippageTicksPerSide cannot be negative");
+Assert(commissionPerContractPerSide >= 0,
+       "commissionPerContractPerSide cannot be negative");
+Assert(!useDateFilter or startDate <= endDate,
+       "startDate must be before or equal to endDate");
+
+# Direct RGB colors avoid palette-backed strategy initialization issues.
+def isDaily = GetAggregationPeriod() == AggregationPeriod.DAY;
+def executeAtClose =
+    executionTiming == executionTiming.signalBarClose;
+def inDateRange =
+    !useDateFilter or
+    (GetYYYYMMDD() >= startDate and GetYYYYMMDD() <= endDate);
+def validChartBar = !IsNaN(open) and !IsNaN(close);
+
+# Match the breadth symbols and McClellan calculations in
+# gpt/gpt_mcclellan_normalized.thinkscript.
+def advances;
+def declines;
+switch (exchange) {
+case NYSE:
+    advances = close("$ADVN");
+    declines = close("$DECN");
+case NASDAQ:
+    advances = close("$ADVN/Q");
+    declines = close("$DECN/Q");
+case AMEX:
+    advances = close("$ADVA");
+    declines = close("$DECA");
+case NASDAQ_100:
+    advances = close("$ADVND");
+    declines = close("$DECLND");
+case SP_500:
+    advances = close("$ADVSP");
+    declines = close("$DECLSP");
+case RUSSELL_2000:
+    advances = close("$ADVRL");
+    declines = close("$DECLRL");
+case ALL_US:
+    advances = close("$ADVUS");
+    declines = close("$DECLUS");
+}
+
+def totalIssues = advances + declines;
+def rawBreadth =
+    if ratioAdjusted then
+        if totalIssues != 0
+        then 1000 * (advances - declines) / totalIssues
+        else Double.NaN
+    else advances - declines;
+def breadth = CompoundValue(
+    1,
+    if !IsNaN(rawBreadth) then rawBreadth else breadth[1],
+    0
+);
+def fastEMA = ExpAverage(breadth, fastLength);
+def slowEMA = ExpAverage(breadth, slowLength);
+def mcoRaw = fastEMA - slowEMA;
+
+def cumulativeMCO = CompoundValue(
+    1,
+    cumulativeMCO[1] + (if !IsNaN(rawBreadth) then mcoRaw else 0),
+    0
+);
+def neutralLevel = if ratioAdjusted then 0 else 1000;
+def mcsiRaw =
+    if isCumulative then neutralLevel + cumulativeMCO
+    else neutralLevel + mcoRaw - (10 * fastEMA + 20 * slowEMA);
+
+def mcoMean = Average(mcoRaw, mcoSigmaLength);
+def mcoSD = StDev(mcoRaw, mcoSigmaLength);
+def mcoZeroCentered = if mcoSD != 0 then mcoRaw / mcoSD else 0;
+def mcoZScore =
+    if mcoSD != 0 then (mcoRaw - mcoMean) / mcoSD else 0;
+def mcoScore =
+    if mcoNormalization == mcoNormalization.ZERO_CENTERED_SIGMA
+    then mcoZeroCentered
+    else mcoZScore;
+
+def mcsiMA = MovingAverage(mcsiAverageType, mcsiRaw, mcsiAverageLength);
+def mcsiResidual = mcsiRaw - mcsiMA;
+def mcsiResidualSD = StDev(mcsiResidual, mcsiSigmaLength);
+def mcsiScore =
+    if mcsiResidualSD != 0 then mcsiResidual / mcsiResidualSD else 0;
+def mcsiCurlUp = mcsiRaw > mcsiRaw[1] and mcsiRaw[1] <= mcsiRaw[2];
+def mcsiReclaim = Crosses(mcsiRaw, mcsiMA, CrossingDirection.ABOVE);
+def breadthDataAvailable = !IsNaN(rawBreadth);
+def normalizationReady =
+    !IsNaN(mcoSD) and mcoSD != 0 and
+    !IsNaN(mcsiResidualSD) and mcsiResidualSD != 0;
+
+def trendSMA = Average(close, trendSMALength);
+def trendSMAAvailable = !IsNaN(trendSMA);
+def trendFilterOK =
+    !requireAboveTrendSMA or
+    (trendSMAAvailable and close > trendSMA);
+
+def selectedConfirmation =
+    if confirmationType == confirmationType.MCSI_CURL_UP
+    then mcsiCurlUp
+    else if confirmationType == confirmationType.MCSI_MA_RECLAIM
+    then mcsiReclaim
+    else mcsiCurlUp or mcsiReclaim;
+def timingAlert =
+    isDaily and normalizationReady and mcoScore <= -mcoArmLevel;
+
+# Forward declarations keep signal, order, and reset state causal.
+def setupArmed;
+def armedMCOExtreme;
+def confirmationEvent;
+def filteredSignal;
+def rawSignal;
+def cycleConsumed;
+def position;
+def barsHeld;
+def longEntryEvent;
+def exitEvent;
+
+cycleConsumed = CompoundValue(
+    1,
+    if exitEvent then 0
+    else if rawSignal then 1
+    else cycleConsumed[1],
+    0
+);
+
+# The MCO stretch must precede the confirmation bar. Either a tradable or a
+# trend-filtered confirmation consumes the armed setup.
+setupArmed = CompoundValue(
+    1,
+    if exitEvent or confirmationEvent or cycleConsumed[1] == 1 then 0
+    else if timingAlert then 1
+    else setupArmed[1],
+    0
+);
+
+# Preserve the deepest score from the active washout so signal annotations show
+# the setup's actual breadth extreme rather than the repaired MCO value.
+armedMCOExtreme = CompoundValue(
+    1,
+    if exitEvent or confirmationEvent then Double.NaN
+    else if timingAlert then
+        if setupArmed[1] == 0 or IsNaN(armedMCOExtreme[1])
+        then mcoScore
+        else Min(armedMCOExtreme[1], mcoScore)
+    else armedMCOExtreme[1],
+    Double.NaN
+);
+
+confirmationEvent =
+    isDaily and
+    inDateRange and
+    validChartBar and
+    breadthDataAvailable and
+    normalizationReady and
+    cycleConsumed[1] == 0 and
+    setupArmed[1] == 1 and
+    selectedConfirmation;
+
+rawSignal = confirmationEvent and trendFilterOK;
+filteredSignal = confirmationEvent and !trendFilterOK;
+
+# AddOrder draws on the following bar. Custom state aligns statistics with the
+# selected next-open or idealized signal-close execution model.
+longEntryEvent =
+    if executeAtClose
+    then rawSignal and position[1] == 0
+    else rawSignal[1] and position[1] == 0 and validChartBar;
+
+exitEvent =
+    position[1] == 1 and
+    barsHeld[1] >= holdingBars - 1 and
+    validChartBar;
+
+position = CompoundValue(
+    1,
+    if exitEvent then 0
+    else if longEntryEvent then 1
+    else position[1],
+    0
+);
+
+barsHeld = CompoundValue(
+    1,
+    if longEntryEvent then 0
+    else if position == 1 then barsHeld[1] + 1
+    else 0,
+    0
+);
+
+def longEntryOrder =
+    if executeAtClose
+    then longEntryEvent
+    else rawSignal and position == 0;
+def longExitOrder =
+    if executeAtClose
+    then exitEvent
+    else position == 1 and barsHeld >= holdingBars - 1;
+def entryOrderPrice = if executeAtClose then close else open[-1];
+def exitOrderPrice = if executeAtClose then close else open[-1];
+
+AddOrder(
+    OrderType.BUY_TO_OPEN,
+    longEntryOrder,
+    entryOrderPrice,
+    tradeSize,
+    CreateColor(0, 197, 49),
+    CreateColor(0, 197, 49),
+    "McClellan breadth repair"
+);
+
+AddOrder(
+    OrderType.SELL_TO_CLOSE,
+    longExitOrder,
+    exitOrderPrice,
+    tradeSize,
+    CreateColor(255, 255, 0),
+    CreateColor(255, 255, 0),
+    "Timed exit"
+);
+
+plot ChartTrendSMA = if showTrendSMA then trendSMA else Double.NaN;
+ChartTrendSMA.SetDefaultColor(CreateColor(211, 211, 211));
+ChartTrendSMA.SetLineWeight(2);
+ChartTrendSMA.HideBubble();
+
+# These diagnostic plots are disabled by default because sigma values distort
+# an upper price pane's scale.
+plot MCOScoreDiagnostic =
+    if showMCOScorePlot then mcoScore else Double.NaN;
+MCOScoreDiagnostic.SetDefaultColor(CreateColor(255, 95, 95));
+MCOScoreDiagnostic.SetLineWeight(2);
+MCOScoreDiagnostic.HideBubble();
+
+plot MCSIScoreDiagnostic =
+    if showMCSIScorePlot then mcsiScore else Double.NaN;
+MCSIScoreDiagnostic.SetDefaultColor(CreateColor(0, 255, 255));
+MCSIScoreDiagnostic.SetLineWeight(2);
+MCSIScoreDiagnostic.HideBubble();
+
+plot ArmedState = if showArmedPlot then setupArmed else Double.NaN;
+ArmedState.SetPaintingStrategy(PaintingStrategy.HISTOGRAM);
+ArmedState.SetDefaultColor(CreateColor(255, 190, 70));
+ArmedState.SetLineWeight(3);
+ArmedState.HideBubble();
+
+plot BreadthRepairSignal =
+    if showSignal and rawSignal then low - 2 * TickSize()
+    else Double.NaN;
+BreadthRepairSignal.SetPaintingStrategy(PaintingStrategy.ARROW_UP);
+BreadthRepairSignal.SetDefaultColor(CreateColor(0, 197, 49));
+BreadthRepairSignal.SetLineWeight(4);
+BreadthRepairSignal.HideBubble();
+BreadthRepairSignal.HideTitle();
+
+plot FilteredBreadthRepair =
+    if showFilteredSignals and filteredSignal then high + 2 * TickSize()
+    else Double.NaN;
+FilteredBreadthRepair.SetPaintingStrategy(PaintingStrategy.ARROW_DOWN);
+FilteredBreadthRepair.SetDefaultColor(CreateColor(255, 95, 95));
+FilteredBreadthRepair.SetLineWeight(3);
+FilteredBreadthRepair.HideBubble();
+FilteredBreadthRepair.HideTitle();
+
+AddChartBubble(
+    showSignalBubble and rawSignal,
+    low,
+    "MCO low " + AsText(Round(armedMCOExtreme[1], 2)) +
+    " | MCSI confirm",
+    CreateColor(0, 197, 49),
+    no
+);
+
+AddChartBubble(
+    showSignalBubble and showFilteredSignals and filteredSignal,
+    high,
+    if trendSMAAvailable
+    then "FILTERED: below " + trendSMALength + "d SMA"
+    else "FILTERED: " + trendSMALength + "d SMA unavailable",
+    CreateColor(255, 95, 95),
+    yes
+);
+
+# Dollar-normalized performance statistics.
+def symbolTickSize = TickSize();
+def symbolTickValue = TickValue();
+def automaticPointValue =
+    if symbolTickSize > 0 and symbolTickValue > 0
+    then symbolTickValue / symbolTickSize
+    else dollarsPerPointOverride;
+def dollarsPerPoint =
+    if useAutomaticPointValue
+    then automaticPointValue
+    else dollarsPerPointOverride;
+def slippagePerSide = slippageTicksPerSide * symbolTickSize;
+
+def unadjustedEntryPrice = if executeAtClose then close else open;
+def modeledEntryPrice = CompoundValue(
+    1,
+    if longEntryEvent
+    then unadjustedEntryPrice + slippagePerSide
+    else modeledEntryPrice[1],
+    0
+);
+def unadjustedExitPrice = if executeAtClose then close else open;
+def modeledExitPrice = unadjustedExitPrice - slippagePerSide;
+def roundTripCommission =
+    2 * commissionPerContractPerSide * tradeSize;
+def closedTradePL =
+    if exitEvent
+    then (modeledExitPrice - modeledEntryPrice[1]) *
+         dollarsPerPoint * tradeSize - roundTripCommission
+    else 0;
+
+def totalTrades = CompoundValue(
+    1,
+    totalTrades[1] + (if exitEvent then 1 else 0),
+    0
+);
+def winningTrades = CompoundValue(
+    1,
+    winningTrades[1] +
+        (if exitEvent and closedTradePL > 0 then 1 else 0),
+    0
+);
+def grossWins = CompoundValue(
+    1,
+    grossWins[1] +
+        (if exitEvent and closedTradePL > 0 then closedTradePL else 0),
+    0
+);
+def grossLosses = CompoundValue(
+    1,
+    grossLosses[1] +
+        (if exitEvent and closedTradePL < 0 then closedTradePL else 0),
+    0
+);
+def realizedPL = CompoundValue(
+    1,
+    realizedPL[1] + closedTradePL,
+    0
+);
+
+def openPL =
+    if position == 1
+    then (close - modeledEntryPrice) * dollarsPerPoint * tradeSize -
+         commissionPerContractPerSide * tradeSize
+    else 0;
+def equity = initialCapital + realizedPL + openPL;
+def equityPeak = CompoundValue(
+    1,
+    Max(equityPeak[1], equity),
+    initialCapital
+);
+def currentDrawdown = Max(0, equityPeak - equity);
+def currentDrawdownPercent =
+    if equityPeak > 0 then 100 * currentDrawdown / equityPeak else 0;
+def maxDrawdown = CompoundValue(
+    1,
+    Max(maxDrawdown[1], currentDrawdown),
+    0
+);
+def maxDrawdownPercent = CompoundValue(
+    1,
+    Max(maxDrawdownPercent[1], currentDrawdownPercent),
+    0
+);
+
+def winRate =
+    if totalTrades > 0 then 100 * winningTrades / totalTrades else 0;
+def averageTrade =
+    if totalTrades > 0 then realizedPL / totalTrades else 0;
+def profitFactor =
+    if grossLosses < 0 then grossWins / AbsValue(grossLosses) else 0;
+
+AddLabel(
+    showStateLabels,
+    if position == 1 then
+        "LONG | held " + barsHeld + " of " + holdingBars
+    else if cycleConsumed == 1 then
+        "ENTRY PENDING"
+    else if setupArmed == 1 then
+        "MCO ARMED | low " + AsText(Round(armedMCOExtreme, 2)) +
+        " sigma"
+    else
+        "MCO WAITING | " + AsText(Round(mcoScore, 2)) + " sigma",
+    if position == 1 then CreateColor(0, 197, 49)
+    else if setupArmed == 1 then CreateColor(255, 190, 70)
+    else CreateColor(128, 128, 128)
+);
+
+AddLabel(
+    showStateLabels,
+    "MCSI vs " + mcsiAverageLength + "dma: " +
+    AsText(Round(mcsiScore, 2)) + " sigma",
+    if mcsiScore > 0 then CreateColor(0, 255, 255)
+    else CreateColor(128, 128, 128)
+);
+
+AddLabel(
+    showStateLabels and requireAboveTrendSMA,
+    if !trendSMAAvailable then
+        "Trend filter: " + trendSMALength + "d SMA unavailable"
+    else if close > trendSMA then
+        "Trend filter: ABOVE " + trendSMALength + "d SMA"
+    else
+        "Trend filter: BELOW " + trendSMALength + "d SMA",
+    if trendSMAAvailable and close > trendSMA
+    then CreateColor(0, 197, 49)
+    else CreateColor(255, 95, 95)
+);
+
+AddLabel(
+    showPerformanceLabels,
+    if executeAtClose then "Model: signal close" else "Model: next open",
+    if executeAtClose
+    then CreateColor(255, 190, 70)
+    else CreateColor(211, 211, 211)
+);
+AddLabel(showPerformanceLabels, "Trades: " + totalTrades,
+         CreateColor(211, 211, 211));
+AddLabel(
+    showPerformanceLabels,
+    "Net P/L: $" + Round(realizedPL, 2),
+    if realizedPL > 0 then CreateColor(0, 197, 49)
+    else if realizedPL < 0 then CreateColor(255, 95, 95)
+    else CreateColor(128, 128, 128)
+);
+AddLabel(showPerformanceLabels,
+         "Win rate: " + Round(winRate, 1) + "%",
+         CreateColor(211, 211, 211));
+AddLabel(
+    showPerformanceLabels,
+    "Avg trade: $" + Round(averageTrade, 2),
+    if averageTrade > 0 then CreateColor(0, 197, 49)
+    else if averageTrade < 0 then CreateColor(255, 95, 95)
+    else CreateColor(128, 128, 128)
+);
+AddLabel(showPerformanceLabels,
+         "Profit factor: " + Round(profitFactor, 2),
+         CreateColor(211, 211, 211));
+AddLabel(
+    showPerformanceLabels,
+    "Max DD: $" + Round(maxDrawdown, 2) +
+    " (" + Round(maxDrawdownPercent, 1) + "%)",
+    CreateColor(255, 95, 95)
+);
+
+AddLabel(
+    !isDaily,
+    "Designed for daily bars; orders are disabled",
+    CreateColor(255, 95, 95)
+);
+AddLabel(
+    !breadthDataAvailable,
+    "No data for selected breadth exchange",
+    CreateColor(255, 95, 95)
+);
