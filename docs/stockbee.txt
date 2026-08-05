@@ -1,0 +1,160 @@
+// TI-65
+
+fRaw = ind.sma(close, 7)
+sRaw = ind.sma(close, 65)
+tiValue = (100 * (fill_none(fRaw) / fill_none(sRaw))) - 100 
+
+
+isBullish = (tiValue >= 5.0)
+plotBull = isBullish ? 100.0 : 0.0
+
+
+isBearish = (tiValue <= -5.0)
+plotBear = isBearish ? 100.0 : 0.0
+
+
+pBull = plt(plotBull, name="65", color=color.lime, type=plt.type_line, line_width=1)
+pBear = plt(plotBear, name="65", color=color.red, type=plt.type_line, line_width=1)
+pBase = plt(0.0, name="Baseline", color=color.gray, opacity=0, type=plt.type_line, line_width=1)
+
+
+plt.fill_between(pBull, pBase, color.lime, opacity=30, name="65")
+plt.fill_between(pBear, pBase, color.red, opacity=30, name="65")
+
+---
+
+// EP9
+
+// Stockbee Momentum Indicator - Final Configuration
+// Lines (100k Vol): Shaded with fill
+// Histograms (9M Vol): Solid bars, no fill
+
+// --- Declarations ---
+float c1 = close[1]
+float v1 = volume[1]
+float min_vol_line = 100000   // 100k for Lines
+float min_vol_ep9  = 9000000  // 9M for Histograms
+
+// --- Calculation Logic ---
+
+// Bullish Logic
+float bull_4pct_line = ((close / c1) >= 1.04) and (volume > v1) and (volume >= min_vol_line) ? 100.0 : 0.0
+float bull_ep9_hist  = ((close / c1) >= 1.04) and (volume > v1) and (volume >= min_vol_ep9) ? 90.0 : 0.0
+
+// Bearish Logic
+float bear_4pct_line = ((close / c1) <= 0.96) and (volume > v1) and (volume >= min_vol_line) ? 100.0 : 0.0
+float bear_ep9_hist  = ((close / c1) <= 0.96) and (volume > v1) and (volume >= min_vol_ep9) ? 70.0 : 0.0
+
+// --- Plotting ---
+
+// 1. Momentum Lines (4% / 100k) - Assigned to variables for fill
+pBull = plt(bull_4pct_line, name=" ", color=color.green, type=plt.type_line, line_width=2)
+pBear = plt(bear_4pct_line, name=" ", color=color.red, type=plt.type_line, line_width=2)
+
+
+// 3. Baseline for Fill (Invisible)
+pBase = plt(0.0, name="Baseline", color=color.gray, opacity=0, type=plt.type_line, line_width=1)
+
+// 4. Fill Application (ONLY applied to the lines)
+plt.fill_between(pBull, pBase, color.green, opacity=10, name=" ")
+plt.fill_between(pBear, pBase, color.red, opacity=10, name=" ")
+
+// 2. EP9 Histograms (4% / 9M)
+plt(bull_ep9_hist, name=" ", color=color.black, type=plt.type_histogram, opacity=100, line_width=5)
+plt(bear_ep9_hist, name=" ", color=color.red, type=plt.type_histogram, opacity=100, line_width=5)
+
+---
+
+// === Stockbee M20 Indicator (Inverted + White Space) ===
+
+// 1) Declaration of all variables
+float min_30 = close[1]
+float max_30 = close[1]
+float min_vol = 0.0
+
+// 2) Manual 30-bar lookback loop
+min_30 := (close[2] < min_30) ? close[2] : min_30
+min_30 := (close[3] < min_30) ? close[3] : min_30
+min_30 := (close[4] < min_30) ? close[4] : min_30
+min_30 := (close[5] < min_30) ? close[5] : min_30
+min_30 := (close[6] < min_30) ? close[6] : min_30
+min_30 := (close[7] < min_30) ? close[7] : min_30
+min_30 := (close[8] < min_30) ? close[8] : min_30
+min_30 := (close[9] < min_30) ? close[9] : min_30
+min_30 := (close[10] < min_30) ? close[10] : min_30
+min_30 := (close[11] < min_30) ? close[11] : min_30
+min_30 := (close[12] < min_30) ? close[12] : min_30
+min_30 := (close[13] < min_30) ? close[13] : min_30
+min_30 := (close[14] < min_30) ? close[14] : min_30
+min_30 := (close[15] < min_30) ? close[15] : min_30
+min_30 := (close[16] < min_30) ? close[16] : min_30
+min_30 := (close[17] < min_30) ? close[17] : min_30
+min_30 := (close[18] < min_30) ? close[18] : min_30
+min_30 := (close[19] < min_30) ? close[19] : min_30
+min_30 := (close[20] < min_30) ? close[20] : min_30
+min_30 := (close[21] < min_30) ? close[21] : min_30
+min_30 := (close[22] < min_30) ? close[22] : min_30
+min_30 := (close[23] < min_30) ? close[23] : min_30
+min_30 := (close[24] < min_30) ? close[24] : min_30
+min_30 := (close[25] < min_30) ? close[25] : min_30
+min_30 := (close[26] < min_30) ? close[26] : min_30
+min_30 := (close[27] < min_30) ? close[27] : min_30
+min_30 := (close[28] < min_30) ? close[28] : min_30
+min_30 := (close[29] < min_30) ? close[29] : min_30
+min_30 := (close[30] < min_30) ? close[30] : min_30
+
+max_30 := (close[2] > max_30) ? close[2] : max_30
+max_30 := (close[3] > max_30) ? close[3] : max_30
+max_30 := (close[4] > max_30) ? close[4] : max_30
+max_30 := (close[5] > max_30) ? close[5] : max_30
+max_30 := (close[6] > max_30) ? close[6] : max_30
+max_30 := (close[7] > max_30) ? close[7] : max_30
+max_30 := (close[8] > max_30) ? close[8] : max_30
+max_30 := (close[9] > max_30) ? close[9] : max_30
+max_30 := (close[10] > max_30) ? close[10] : max_30
+max_30 := (close[11] > max_30) ? close[11] : max_30
+max_30 := (close[12] > max_30) ? close[12] : max_30
+max_30 := (close[13] > max_30) ? close[13] : max_30
+max_30 := (close[14] > max_30) ? close[14] : max_30
+max_30 := (close[15] > max_30) ? close[15] : max_30
+max_30 := (close[16] > max_30) ? close[16] : max_30
+max_30 := (close[17] > max_30) ? close[17] : max_30
+max_30 := (close[18] > max_30) ? close[18] : max_30
+max_30 := (close[19] > max_30) ? close[19] : max_30
+max_30 := (close[20] > max_30) ? close[20] : max_30
+max_30 := (close[21] > max_30) ? close[21] : max_30
+max_30 := (close[22] > max_30) ? close[22] : max_30
+max_30 := (close[23] > max_30) ? close[23] : max_30
+max_30 := (close[24] > max_30) ? close[24] : max_30
+max_30 := (close[25] > max_30) ? close[25] : max_30
+max_30 := (close[26] > max_30) ? close[26] : max_30
+max_30 := (close[27] > max_30) ? close[27] : max_30
+max_30 := (close[28] > max_30) ? close[28] : max_30
+max_30 := (close[29] > max_30) ? close[29] : max_30
+max_30 := (close[30] > max_30) ? close[30] : max_30
+
+// 3) Volume Filter
+min_vol := (volume[1] < volume[2]) ? volume[1] : volume[2]
+min_vol := (min_vol < volume[3]) ? min_vol : volume[3]
+
+// 4) Logic
+bool isBullish = ((close / min_30 >= 1.20) or (close - min_30 >= 20.0)) and (close >= 3.0) and (min_vol >= 100000.0)
+bool isBearish = ((close / max_30 <= 0.80) or (max_30 - close >= 20.0)) and (close >= 5.0) and (min_vol >= 100000.0)
+
+// 5) Define Positions (Bullish at bottom, Bearish at top)
+float plotBull = isBullish ? 80.0 : 0.0
+float plotBear = isBearish ? 120.0 : 200.0
+
+
+// Plot the lines
+pBull = plt(plotBull, name=" ", color=color.green, type=plt.type_line, line_width=2)
+pBear = plt(plotBear, name=" ", color=color.red, type=plt.type_line, line_width=2)
+
+// Baselines
+pBaseLow  = plt(0.0, name=" ", color=color.gray, opacity=0, type=plt.type_line, line_width=1)
+pBaseHigh = plt(200.0, name=" ", color=color.gray, opacity=0, type=plt.type_line, line_width=1)
+
+// Fill logic (Bullish up from bottom, Bearish down from top)
+plt.fill_between(pBull, pBaseLow, color.green, opacity=50, name=" ")
+plt.fill_between(pBear, pBaseHigh, color.red, opacity=50, name=" ")
+
