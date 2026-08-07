@@ -7,7 +7,7 @@
 #     both its open and its prior close, provided the charted security closes
 #     above its 200-day simple moving average.
 # Exit:
-#   - Close the position holdingBars chart sessions after entry.
+#   - Close the position after the charted security closes below its 9-day EMA.
 #   - Ignore new setups while the position is open, then reset the SPX peak on
 #     the exit session and begin tracking a new decline episode.
 #
@@ -19,7 +19,7 @@ declare hide_on_intraday;
 
 input referenceSymbol = "SPX";
 input declinePercent = 5.0;
-input holdingBars = 10;
+input exitEMALength = 9;
 input executionTiming = {default nextBarOpen, signalBarClose};
 input requireAboveTrendSMA = yes;
 input trendSMALength = 200;
@@ -39,6 +39,7 @@ input showSignal = yes;
 input showSignalBubble = yes;
 input showFilteredSignals = yes;
 input showTrendSMA = yes;
+input showExitEMA = yes;
 input showPerformanceLabels = yes;
 input showStateLabels = yes;
 input showSPXPeakPlot = no;
@@ -47,7 +48,7 @@ input showArmedPlot = no;
 
 Assert(declinePercent > 0 and declinePercent < 100,
        "declinePercent must be greater than zero and less than 100");
-Assert(holdingBars > 0, "holdingBars must be greater than zero");
+Assert(exitEMALength > 0, "exitEMALength must be greater than zero");
 Assert(trendSMALength > 0, "trendSMALength must be greater than zero");
 Assert(tradeSize > 0, "tradeSize must be greater than zero");
 Assert(initialCapital > 0, "initialCapital must be greater than zero");
@@ -77,6 +78,11 @@ def validReferenceBar =
     !IsNaN(spxClose) and
     !IsNaN(spxClose[1]);
 def validChartBar = !IsNaN(open) and !IsNaN(close);
+def exitEMA = ExpAverage(close, exitEMALength);
+def emaExitSignal =
+    validChartBar and
+    !IsNaN(exitEMA) and
+    close < exitEMA;
 def trendSMA = Average(close, trendSMALength);
 def trendSMAAvailable = !IsNaN(trendSMA);
 def trendFilterOK =
@@ -165,8 +171,9 @@ longEntryEvent =
 
 exitEvent =
     position[1] == 1 and
-    barsHeld[1] >= holdingBars - 1 and
-    validChartBar;
+    (if executeAtClose
+     then emaExitSignal
+     else emaExitSignal[1] and validChartBar);
 
 position = CompoundValue(
     1,
@@ -191,7 +198,7 @@ def longEntryOrder =
 def longExitOrder =
     if executeAtClose
     then exitEvent
-    else position == 1 and barsHeld >= holdingBars - 1;
+    else position == 1 and emaExitSignal;
 
 def entryOrderPrice = if executeAtClose then close else open[-1];
 def exitOrderPrice = if executeAtClose then close else open[-1];
@@ -213,8 +220,14 @@ AddOrder(
     tradeSize,
     CreateColor(255, 255, 0),
     CreateColor(255, 255, 0),
-    "Timed exit"
+    AsText(exitEMALength) + "d EMA exit"
 );
+
+plot ChartExitEMA =
+    if showExitEMA then exitEMA else Double.NaN;
+ChartExitEMA.SetDefaultColor(CreateColor(255, 190, 70));
+ChartExitEMA.SetLineWeight(2);
+ChartExitEMA.HideBubble();
 
 plot ChartTrendSMA =
     if showTrendSMA then trendSMA else Double.NaN;
@@ -381,7 +394,8 @@ def profitFactor =
 AddLabel(
     showStateLabels,
     if position == 1 then
-        "LONG | held " + barsHeld + " of " + holdingBars
+        "LONG | held " + barsHeld +
+        " | exit below " + exitEMALength + "d EMA"
     else if cycleConsumed == 1 then
         "ENTRY PENDING"
     else if setupArmed == 1 then
