@@ -1,0 +1,65 @@
+#
+# Weis Wave Volume
+# ThinkScript port of LazyBear's TradingView indicator:
+# https://www.tradingview.com/script/HFGx4ote-Indicator-Weis-Wave-Volume-LazyBear/
+#
+# Volume accumulates while price remains in the same confirmed wave and resets
+# when a wave in the opposite direction is confirmed.
+#
+
+declare lower;
+declare zerobase;
+
+input trendDetectionLength = 3;
+input showDistributionBelowZero = no;
+input paintBars = no;
+
+# Direction of the current close relative to the prior close.
+def movement = if close > close[1] then 1
+               else if close < close[1] then -1
+               else 0;
+
+# Retain the last non-zero change in direction. CompoundValue supplies the
+# zero initialization performed by nz(trend[1]) in the original Pine script.
+def trend = CompoundValue(1,
+    if movement != 0 and movement != movement[1]
+    then movement
+    else trend[1],
+    0);
+
+# Pine's rising/falling test confirms a new closing high or low relative to
+# the preceding detection window. ThinkScript's similarly named IsAscending
+# and IsDescending functions use regression slopes, so they are not equivalent.
+def isTrending = close > Highest(close[1], trendDetectionLength) or
+                 close < Lowest(close[1], trendDetectionLength);
+def wave = CompoundValue(1,
+    if trend != wave[1] and isTrending
+    then trend
+    else wave[1],
+    0);
+
+# Reset accumulated volume on a confirmed wave change.
+def waveVolume = CompoundValue(1,
+    if wave == wave[1]
+    then waveVolume[1] + volume
+    else volume,
+    volume);
+
+plot up = if wave == 1 then waveVolume else 0;
+plot dn = if wave == 1 then 0
+          else if showDistributionBelowZero and wave == -1 then -waveVolume
+          else waveVolume;
+
+up.SetDefaultColor(Color.GREEN);
+dn.SetDefaultColor(Color.RED);
+up.SetLineWeight(3);
+dn.SetLineWeight(3);
+up.SetPaintingStrategy(PaintingStrategy.HISTOGRAM);
+dn.SetPaintingStrategy(PaintingStrategy.HISTOGRAM);
+
+AssignPriceColor(
+    if !paintBars then Color.CURRENT
+    else if wave == 1 then Color.DARK_GREEN
+    else if wave == -1 then Color.DOWNTICK
+    else Color.CURRENT
+);

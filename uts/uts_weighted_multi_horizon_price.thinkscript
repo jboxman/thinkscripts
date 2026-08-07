@@ -1,0 +1,100 @@
+#
+# Weighted Multi-Horizon Price Strength
+# -------------------------------------
+# Custom quote/scan value that emphasizes recent price strength while also
+# incorporating intermediate- and long-term trend position.
+#
+# The raw score multiplies:
+#
+# 1. The current close divided by its short moving average (6 bars by default)
+# 2. A weighted blend of the close divided by its 63-, 126-, 189-, and
+#    252-bar simple moving averages
+#
+# The moving-average ratios receive weights of 2.00, 1.00, 0.75, and 0.50,
+# respectively, so the most recent quarter has the greatest influence. The
+# composite is normalized to a 1-100 range using all data loaded for the
+# selected aggregation. Higher values indicate stronger price performance
+# relative to the symbol's own recent and long-term averages.
+#
+# Important limitations:
+# - Despite the original "WRS" name, the script does not compare the symbol
+#   with a market benchmark. It is price strength, not traditional relative
+#   strength.
+# - HighestAll/LowestAll normalize each symbol against its own loaded history.
+#   Scores therefore depend on aggregation and available history, can change
+#   when that history changes, and are not directly comparable across symbols.
+# - Lengths are measured in bars. On daily aggregation, 63/126/189/252 bars
+#   approximate one quarter, half year, three quarters, and one trading year.
+#   The 6-bar short length is slightly longer than a typical five-day week.
+# - At least 252 usable bars are needed for the default calculation.
+#
+# Based on MYexpRS3/RSwQH3qY by Markos, repaired by Dave_S (2019-10-09).
+#
+
+input yearLength = 252;
+input threeQuarterLength = 189;
+input halfYearLength = 126;
+input quarterLength = 63;
+input shortLength = 6;
+
+script PriceToAverageRatio {
+    input price = close;
+    input length = 20;
+
+    def averagePrice = Average(price, length);
+
+    plot ratio =
+        if IsNaN(price) or IsNaN(averagePrice) or averagePrice == 0 then
+            Double.NaN
+        else
+            price / averagePrice;
+}
+
+script NormalizeAllBars {
+    input value = close;
+    input minimum = 1;
+    input maximum = 100;
+
+    def highestValue = HighestAll(value);
+    def lowestValue = LowestAll(value);
+    def valueRange = highestValue - lowestValue;
+
+    plot normalizedValue =
+        if IsNaN(value) or IsNaN(valueRange) or valueRange == 0 then
+            Double.NaN
+        else
+            minimum + (maximum - minimum) *
+                (value - lowestValue) / valueRange;
+}
+
+def shortRatio = PriceToAverageRatio(
+    price = close,
+    length = shortLength
+);
+def quarterRatio = PriceToAverageRatio(
+    price = close,
+    length = quarterLength
+);
+def halfYearRatio = PriceToAverageRatio(
+    price = close,
+    length = halfYearLength
+);
+def threeQuarterRatio = PriceToAverageRatio(
+    price = close,
+    length = threeQuarterLength
+);
+def yearRatio = PriceToAverageRatio(
+    price = close,
+    length = yearLength
+);
+
+def weightTotal = 2.00 + 1.00 + 0.75 + 0.50;
+def weightedLongTermRatio =
+    (2.00 * quarterRatio +
+     1.00 * halfYearRatio +
+     0.75 * threeQuarterRatio +
+     0.50 * yearRatio) / weightTotal;
+
+def compositeStrength = shortRatio * weightedLongTermRatio;
+
+plot WRS = NormalizeAllBars(compositeStrength);

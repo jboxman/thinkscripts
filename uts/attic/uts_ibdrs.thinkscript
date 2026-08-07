@@ -1,0 +1,141 @@
+#==============================================================================
+# SMO_RsRank.ts:  TOS script mimicking IBD Relative Strength Rank
+# Version 1: 2021-01-24
+# Calculated according to the following principles:
+#   The Relative Strength Rating is the result of calculating a stock’s
+#   percentage change of prices over the last 4 quarters:
+#   A 40% weight is assigned to the latest quarter period;
+#   the remaining three quarters each has 20% weight.
+#   The stock's price performance is compared w/ a general market index
+#   (e.g.SPX) to generate relative strength.
+#   It's intended to rate stocks in order of greatest price performance
+#   and assigned a percentile rank from 99 (highest) to 1 (lowest). A 50% rank
+#   indicates same price performance as the general market index.
+#
+# Two step usage procedure:
+#   1). Get calibrated data first
+#       Create a custom scan by copying the code from the beginning to the
+#       the section marked as "End of Scan Code Section"
+#       Need to add a custom quote named as "IBD_RS" for sorting top and
+#       bottom scores
+#   2). Input calibrated data
+#       Put the obtained data to the variables defined below the section
+#       named "Multipoint Calibration"
+#       There are 3 data points for this version and may be updated weekly
+#       or monthly, depending on your trading time frame.
+#   The prices used here are close prices and the quarter may be calendar
+#   quarter or other number of days if shorter term ranking is desired.
+#==============================================================================
+
+script my_rsrank {
+# Set length to period of interest.
+# Only total length of days is input and other periods are derived
+input len4 = 252;
+input cl =  close;
+
+def len1 = round(len4/4, 0);   #63;
+def len2 = len1 * 2; #126;
+def len3 = len1 * 3; #189
+
+# Calculate price change percentages per quarter
+def p4q = (cl[len3]-cl[len4]) / cl[len4];
+def p3q = (cl[len2]-cl[len3]) / cl[len3];
+def p2q = (cl[len1]-cl[len2]) / cl[len2];
+def p1q = (cl-cl[len1]) / cl[len1];
+def weighted = ((2*p1q) + p2q + p3q + p4q) / 5;
+
+plot rsrank = 100 * weighted;
+}
+
+#  1 Wk – 5 trading days
+#  1 Mos – 21 Days
+#  3 Mos – 63 Days
+#  6 Mos – 126 Days
+#  12 Mos – 252 Days
+def len4 = 252;
+# Use the following for 6 month period ranking
+#def len4 = 126;
+
+def stockCl = close;
+def indexCl = close("SPX");
+
+def stock_rsrank = my_rsrank(len4, stockCl);
+#plot stockdbg = stock_rsrank;
+
+def index_rsrank = my_rsrank(len4, indexCl);
+#plot indexdbg = index_rsrank;
+
+def index_rsrank1 = if (index_rsrank == 0, index_rsrank[1], index_rsrank);
+def RS = stock_rsrank/index_rsrank1;
+
+#------------------- Code required for Custom Quote in Scan Tab----------------
+# Selectively uncomment the following code in scan tab
+# The following RS scores as of today need to be adjusted in each periodical
+# calibrations
+# Possible RS scores for bottom 1%
+#input rs_score = -1;
+# Possible RS scores for top 1%
+#input rs_score = 4.5;
+# Possible RS scores for top 10%
+#input rs_score = 2.8;
+#plot scan = if rs_score <= 0 then rs < rs_score else
+#            rs > rs_score;
+#---------------- End of Scan Code Section ------------------------------------
+
+# Uncomment the following if display of relative strength is required
+# Please select the option of left axis for this indicator
+#plot rsCurve = rs;
+
+#-------------------- Multipoint Calibration ----------------------------------
+# Get the max & min values of RS for the reference index_rsrank (e.g. SPX)
+# by using the TOS scan /w customized quote IBD_RS and sorting the results
+# Max value is the min rs value of the top 5 (1%) stocks in the SP 500
+# Min value is the max rs value of the bottom 5 (1%) stocks in the SP 500
+# The calibration should be done weekly or at other time as necessary
+# Replace the values below with the values obtained from custom quote
+
+# RS score corresponding to 99 percentile
+def HHData = 6.1;
+# RS score corresponding to 1 percentile
+def LLData = -1.1;
+# Add a 90% calibration point since we are very interested at this percentile
+# The RS score should be the score of top n'th stock,
+# where n is the Total number of Index Stocks (e.g. 505 for SPX) x (100% - 90%)
+# (e.g. 51 for SPX)
+def d90    = 2.91;
+
+#------------------- End of Calibration Data -----------------------------------
+
+# For SPX & SPY, the RS score should be 1 and correlate to a 50 percentile rank
+def d50    = 1;
+
+def rsCalibrated = if rs > HHData then HHData else
+                   if rs < LLData then LLData else
+                   RS;
+#plot dbgCal = rsCalibrated;
+
+# Create final RS rank /w multiple point calibrated segments
+# Formula for each segment:
+# Segment RS Rank = [(End RS Rank - Start RS Rank) * (RScalibrated - Start RS)) /
+#                   (End RS - Start RS)] + Start RS Rank
+plot nr = # Segment:  Start Rank: 1, End Rank: 50
+          if rsCalibrated <= 1 then
+            (( 49 * ( RScalibrated - LLData )) / ( d50 - LLData )) + 1
+          else
+          # Segment: Start Rank: 51, End Rank: 90
+          if rsCalibrated <= d90 then
+            (( 39 * ( RScalibrated - d50 )) / ( d90 - d50 )) + 51
+          # Segment: Start Rank: 91, End Rank: 99
+          else
+            (( 8 * ( RScalibrated - d90 )) / ( HHData - d90 )) + 91;
+nr.hide();
+
+# Color coding from top to bottom ranks:
+# Bright Green -> Dark Green -> Grey -> Dark Red -> Bright Red
+AddLabel(yes, Concat("RS Ranking: ", round(nr, 0)),
+        if nr > 80 then color.green else
+                       if nr > 60 and nr <= 80 then color.dark_green else
+                       if nr > 40 and nr <= 60 then color.gray else
+                       if nr > 20 and nr <= 40 then color.red else
+                       color.red) ;
+# End of Code

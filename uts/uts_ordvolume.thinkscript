@@ -1,0 +1,152 @@
+# VM_Ord_Volume_v01
+# By GrOwEx; adapted from the built-in ZigZagSign study.
+#
+# Draws fixed-dollar ZigZag waves and, at each completed pivot, optionally shows
+# the wave's average volume per bar. Values are divided by volumedivider before
+# display (the default 1000 displays volume in thousands).
+#
+# Like every ZigZag study, the current wave is provisional. Its endpoint can
+# move, and a historical pivot is not final until price reverses by at least
+# reversalAmount.
+
+declare upper;
+
+input price = close;
+input reversalAmount = 1.0;
+input showBubbles = no;
+input showLabel = no;
+input volumedivider = 1000;
+Assert(reversalAmount > 0, "'reversal amount' should be positive: " + reversalAmount);
+Assert(volumedivider > 0, "'volume divider' should be positive: " + volumedivider);
+
+def barNumber = BarNumber();
+def barCount = HighestAll(If(IsNaN(price), 0, barNumber));
+
+
+def state = {default init, undefined, uptrend, downtrend};
+def minMaxPrice;
+
+
+if (GetValue(state, 1) == GetValue(state.init, 0)) {
+    minMaxPrice = price;
+    state = state.undefined;
+} else if (GetValue(state, 1) == GetValue(state.undefined, 0)) {
+    if (price <= GetValue(minMaxPrice, 1) - reversalAmount) {
+        state = state.downtrend;
+        minMaxPrice = price;
+    } else if (price >= GetValue(minMaxPrice, 1) + reversalAmount) {
+        state = state.uptrend;
+        minMaxPrice = price;
+    } else {
+        state = state.undefined;
+        minMaxPrice = GetValue(minMaxPrice, 1);
+    }
+} else if (GetValue(state, 1) == GetValue(state.uptrend, 0)) {
+    if (price <= GetValue(minMaxPrice, 1) - reversalAmount) {
+        state = state.downtrend;
+        minMaxPrice = price;
+    } else {
+        state = state.uptrend;
+        minMaxPrice = Max(price, GetValue(minMaxPrice, 1));
+    }
+} else {
+    if (price >= GetValue(minMaxPrice, 1) + reversalAmount) {
+        state = state.uptrend;
+        minMaxPrice = price;
+    } else {
+        state = state.downtrend;
+        minMaxPrice = Min(price, GetValue(minMaxPrice, 1));
+    }
+}
+
+
+def isCalculated = GetValue(state, 0) != GetValue(state, 1) and barNumber >= 1;
+def futureDepth =  barCount - barNumber;
+def tmpLastPeriodBar;
+if (isCalculated) {
+    if (futureDepth >= 1 and GetValue(state, 0) == GetValue(state, -1)) {
+        tmpLastPeriodBar = fold lastPeriodBarI = 2 to futureDepth + 1 with lastPeriodBarAcc = 1
+            while lastPeriodBarAcc > 0
+            do if (GetValue(state, 0) != GetValue(state, -lastPeriodBarI))
+                then -lastPeriodBarAcc
+                else lastPeriodBarAcc + 1;
+    } else {
+        tmpLastPeriodBar = 0;
+    }
+} else {
+    tmpLastPeriodBar = Double.NaN;
+}
+
+
+def lastPeriodBar = if (!IsNaN(tmpLastPeriodBar)) then -AbsValue(tmpLastPeriodBar) else -futureDepth;
+
+
+def currentPriceLevel;
+def currentPoints;
+if (state == state.uptrend and isCalculated) {
+    currentPriceLevel =
+        fold barWithMaxOnPeriodI = lastPeriodBar to 1 with barWithMaxOnPeriodAcc = minMaxPrice
+            do Max(barWithMaxOnPeriodAcc, GetValue(minMaxPrice, barWithMaxOnPeriodI));
+    currentPoints =
+        fold maxPointOnPeriodI = lastPeriodBar to 1 with maxPointOnPeriodAcc = Double.NaN
+            while IsNaN(maxPointOnPeriodAcc)
+            do if (GetValue(price, maxPointOnPeriodI) == currentPriceLevel)
+                then maxPointOnPeriodI
+                else maxPointOnPeriodAcc;
+} else if (state == state.downtrend and isCalculated) {
+    currentPriceLevel =
+        fold barWithMinOnPeriodI = lastPeriodBar to 1 with barWithMinOnPeriodAcc = minMaxPrice
+            do Min(barWithMinOnPeriodAcc, GetValue(minMaxPrice, barWithMinOnPeriodI));
+    currentPoints =
+        fold minPointOnPeriodI = lastPeriodBar to 1 with minPointOnPeriodAcc = Double.NaN
+            while IsNaN(minPointOnPeriodAcc)
+            do if (GetValue(price, minPointOnPeriodI) == currentPriceLevel)
+                then minPointOnPeriodI
+                else minPointOnPeriodAcc;
+} else if (!isCalculated and (state == state.uptrend or state == state.downtrend)) {
+    currentPriceLevel = GetValue(currentPriceLevel, 1);
+    currentPoints = GetValue(currentPoints, 1) + 1;
+} else {
+    currentPoints = 1;
+    currentPriceLevel = GetValue(price, currentPoints);
+}
+
+
+plot "ZZ$" = if (barNumber == barCount or barNumber == 1) then price else if (currentPoints == 0) then currentPriceLevel else Double.NaN;
+
+
+def zzSave = if !IsNaN("ZZ$") then price else GetValue(zzSave, 1);
+def chg = price - GetValue(zzSave, 1);
+def isUp = chg >= 0;
+def isConf = AbsValue(chg) >= reversalAmount or (IsNaN(GetValue("ZZ$", 1)) and GetValue(isConf, 1));
+
+
+# Accumulate volume and bar count separately for rising and falling waves.
+rec upWaveVolume = if isUp then volume + upWaveVolume[1] else 0;
+rec downWaveVolume = if !isUp then volume + downWaveVolume[1] else 0;
+rec upWaveBars = if isUp then upWaveBars[1] + 1 else 0;
+rec downWaveBars = if !isUp then downWaveBars[1] + 1 else 0;
+
+# A drop to zero on the following bar marks the completed wave's pivot. The
+# negative index is intentional: confirmed ZigZag pivots inherently look ahead.
+def completedUpAverage = if upWaveVolume > upWaveVolume[-1]
+    then Round(upWaveVolume / upWaveBars / volumedivider, 2)
+    else Double.NaN;
+def completedDownAverage = if downWaveVolume > downWaveVolume[-1]
+    then Round(downWaveVolume / downWaveBars / volumedivider, 2)
+    else Double.NaN;
+
+"ZZ$".EnableApproximation();
+"ZZ$".DefineColor("Up Trend", Color.UPTICK);
+"ZZ$".DefineColor("Down Trend", Color.DOWNTICK);
+"ZZ$".DefineColor("Undefined", Color.DARK_ORANGE);
+"ZZ$".AssignValueColor(if !isConf then "ZZ$".Color("Undefined") else if isUp then "ZZ$".Color("Up Trend") else "ZZ$".Color("Down Trend"));
+DefineGlobalColor("Unconfirmed", Color.DARK_ORANGE);
+DefineGlobalColor("Up", Color.UPTICK);
+DefineGlobalColor("Down", Color.DOWNTICK);
+AddChartBubble(showBubbles and !IsNaN("ZZ$") and barNumber != 1, price,
+    if !IsNaN(completedUpAverage) then completedUpAverage
+    else completedDownAverage,
+    if !isConf then GlobalColor("Unconfirmed") else if isUp then GlobalColor("Up") else GlobalColor("Down"),
+    isUp);
+AddLabel(showLabel and barNumber != 1, (if isConf then "Confirmed " else "Unconfirmed ") + "ZigZag: " + chg, if !isConf then GlobalColor("Unconfirmed") else if isUp then GlobalColor("Up") else GlobalColor("Down"));

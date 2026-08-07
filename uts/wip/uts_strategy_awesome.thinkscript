@@ -1,0 +1,442 @@
+#Awesome Line Oscillator with standard deviation levels and divergence plot
+#Formatted by Chewie 6-21-2023
+
+declare lower;
+declare zerobase;
+
+input ColorBar = no;
+input tradeSize = 100;
+input initialCapital = 10000;
+plot AO = Average(hl2, 5) - Average(hl2, 34);
+plot Zero = 0;
+
+#AO.SetPaintingStrategy(PaintingStrategy.HISTOGRAM);
+AO.SetLineWeight(2);
+AO.DefineColor("Up", Color.GREEN);
+AO.DefineColor("Down", Color.RED);
+AO.AssignValueColor(if AO > AO[1] then AO.color("Up") else if AO < AO[1] then AO.color("Down") else GetColor(1));
+Zero.SetDefaultColor(COLOR.YELLOW);
+
+# 2 Standard Deviation Full
+
+input deviation = 1.68;
+input deviations = 2.0;
+input deviations2 = 2.5;
+input fullRange = Yes;
+input length = 21;
+
+def regression;
+def stdDeviation;
+if (fullRange) {
+    regression = InertiaAll(AO);
+    stdDeviation = StDevAll(AO);
+} else {
+    regression = InertiaAll(AO, length);
+    stdDeviation = StDevAll(AO, length);
+}
+
+def UpperLine = regression + deviations * stdDeviation;
+def LowerLine = regression - deviations * stdDeviation;
+plot Caution = regression - deviation * stdDeviation;
+plot CautionH = regression + deviation * stdDeviation;
+
+#UpperLine.SetDefaultColor(Color.RED);
+#LowerLine.SetDefaultColor(Color.GREEN);
+#UpperLine.SetLineWeight(1);
+#LowerLine.SetLineWeight(1);
+#Upperline.HideBubble();
+#Upperline.Hidetitle();
+#Lowerline.HideBubble();
+#Lowerline.Hidetitle();
+Caution.SetDefaultColor(Color.gray);
+Caution.SetLineWeight(1);
+Caution.HideBubble();
+Caution.Hidetitle();
+CautionH.SetDefaultColor(Color.gray);
+CautionH.SetLineWeight(1);
+CautionH.HideBubble();
+CautionH.Hidetitle();
+
+
+plot UpperLine2 = regression + deviations2 * stdDeviation;
+plot LowerLine2 = regression - deviations2 * stdDeviation;
+
+UpperLine2.SetDefaultColor(Color.RED);
+LowerLine2.SetDefaultColor(Color.GREEN);
+UpperLine2.SetLineWeight(1);
+LowerLine2.SetLineWeight(1);
+UpperLine2.HideBubble();
+UpperLine2.Hidetitle();
+LowerLine2.HideBubble();
+LowerLine2.Hidetitle();
+
+AddCloud(UpperLine2, UpperLine, Color.RED, Color.CURRENT);
+AddCloud(LowerLine, LowerLine2, color.green, Color.CURRENT);
+AddCloud(AO, CautionH, Color.RED, Color.CURRENT);
+AddCloud(Caution, AO, color.green, Color.CURRENT);
+
+#ColorBar
+AssignPriceColor(if !ColorBar then Color.CURRENT else
+                 if AO > AO[1] then AO.color("Up") else if AO < AO[1] then AO.color("Down") else GetColor(1));
+
+# DIVERGENCE
+
+input divergenceLength = 30; #hint divergenceLength: The number of bars used to calculate divergences.
+
+input divergenceType = {default regular, reverse}; #hint divergenceType: The type of divergence. A regular divergence is when price is making higher highs (or lower lows), while the indicator is making lower highs (or higher lows). A reverse divergence (also called a hidden divergence) is when the indicator is making higher highs (or lower lows), while price is making lower highs (or higher lows).
+#Hint: The output of this indicator is for informational and educational use only, is not an investment recommendation or advice, and should not be relied upon in making the decision to buy or sell a security or pursue a particular investment strategy.
+
+def xDownBars;
+def xUpBars;
+def xDowns;
+def xUps;
+def hiBars;
+def loBars;
+def pivotTop;
+def pivotBottom;
+def hiInd;
+def loInd;
+def hiPrice;
+def loPrice;
+plot bearishd;
+plot bullishd;
+
+def K = AO;
+def Over_Boughta = cautionh;
+def Over_Solda = caution;
+
+#K.SetDefaultColor(color.white);
+#K.SetLineWeight(2);
+
+def ind;
+ind = K;
+
+# Bearish
+pivotTop =
+if
+    divergenceType == divergenceType.regular
+then
+    ind[1] > Over_Boughta and ind[1] == Highest(ind, divergenceLength + 1)
+else
+    ind[1] >= 50 and
+    ind[1] == Highest(ind, divergenceLength + 1) and
+    ind[1] == Highest(ind, divergenceLength + 1)[-divergenceLength + 1];
+
+if pivotTop
+then {
+    hiBars = 1;
+    hiInd = ind[1];
+    hiPrice = Max(high[2], Max(high[1], high[0]));
+}
+else {
+    hiBars = hiBars[1] + 1;
+    hiInd = hiInd[1];
+    hiPrice = hiPrice[1];
+}
+
+if ind[1] crosses below  Over_Boughta
+then {
+    xDownBars = 1;
+    xDowns = xDowns[1] + 1;
+}
+else {
+    xDownBars = xDownBars[1] + 1;
+    xDowns = if pivotTop[1] then 0 else xDowns[1];
+}
+
+def bearCond;
+switch (divergenceType) {
+case regular:
+    bearCond =
+    ind[1] >= zero and
+    ind < ind[1] and
+    high[1] == Highest(high, divergenceLength + 1) and
+    hiBars[1] > xDownBars[1] and
+    xDowns == 1 and
+    close < close[1] and
+    hiPrice[1] < high[1] and
+    hiInd[1] > ind[1];
+case reverse:
+    bearCond =
+    ind[1] >= zero and
+    ind < ind[1] and
+#    high[1] == Highest(high, divergenceLength) and
+#    hiBars[1] > xDownBars[1] and
+#    xDowns == 1 and
+    close < close[1] and
+    hiPrice[1] > high[1] and hiPrice[1] > high and
+    hiInd[1] < ind[1];
+}
+
+bearishd =
+    if
+        bearCond
+    then
+        ind[1]
+    else
+        Double.NaN;
+;
+
+bearishd.SetPaintingStrategy(PaintingStrategy.ARROW_DOWN);
+bearishd.SetDefaultColor(Color.gray);
+bearishd.SetLineWeight(2);
+bearishd.HideTitle();
+bearishd.HideBubble();
+
+def countBear = if bearCond[-1] then countBear[1] + 1 else countBear[1];
+def recentBear = countBear == HighestAll(countBear);
+def secHigh = HighestAll(if bearCond[-1] and recentBear then ind else Double.NaN);
+#def firstHigh = highestAll(if bearCond and recentBear and ind[1] == secHigh then hiInd[1] else double.NaN);
+def FH_bar = HighestAll(if recentBear and bearCond[-1] and ind == secHigh then GetValue(BarNumber(), hiBars) else Double.NaN);
+
+plot bearTrendline =
+if
+    recentBear and bearCond[-1] and ind == secHigh
+then
+    Max(ind[1], ind[0])
+else
+#    if pivotTop and hiInd == firstHigh
+    if
+        FH_bar == BarNumber()
+    then
+        ind
+    else
+        Double.NaN;
+bearTrendline.EnableApproximation();
+bearTrendline.SetDefaultColor(Color.RED);
+bearTrendline.SetLineWeight(4);
+bearTrendline.HideBubble();
+bearTrendline.HideTitle();
+
+#Bullish
+pivotBottom =
+if
+    divergenceType == divergenceType.regular
+then
+    ind[1] < Over_Solda and ind[1] == Lowest(ind, divergenceLength + 1)
+else
+    ind[1] <= 50 and
+    ind[1] == Lowest(ind, divergenceLength + 1) and
+    ind[1] == Lowest(ind, divergenceLength + 1)[-divergenceLength + 1];
+
+if pivotBottom
+then {
+    loBars = 1;
+    loInd = ind[1];
+    loPrice = Min(low[2], Min(low[1], low[0]));
+}
+else {
+    loBars = loBars[1] + 1;
+    loInd = loInd[1];
+    loPrice = loPrice[1];
+}
+
+if ind[1] crosses above Over_Solda
+then {
+    xUpBars = 1;
+    xUps = xUps[1] + 1;
+}
+else {
+    xUpBars = xUpBars[1] + 1;
+    xUps = if pivotBottom[1] then 0 else xUps[1];
+}
+
+def bullCond;
+switch (divergenceType){
+case regular:
+    bullCond =
+    ind[1] <= zero and
+    ind > ind[1] and    
+    low[1] == Lowest(low, divergenceLength + 1) and
+    loBars[1] > xUpBars[1] and
+    xUps == 1 and
+    close > close[1] and
+    loPrice[1] > low[1] and
+    loInd[1] < ind[1];
+case reverse:
+    bullCond =
+    ind[1] <= zero and
+    ind > ind[1] and    
+#    low[1] == Lowest(low, divergenceLength) and
+#    loBars[1] > xUpBars[1] and
+#    xUps == 1 and
+    close > close[1] and
+    loPrice[1] < low[1] and loPrice[1] < low and
+    loInd[1] > ind[1];
+}
+
+bullishd =
+    if
+        bullCond
+    then
+        ind[1]
+    else
+        Double.NaN;
+
+bullishd.SetPaintingStrategy(PaintingStrategy.ARROW_UP);
+bullishd.SetDefaultColor(Color.gray);
+bullishd.SetLineWeight(2);
+bullishd.HideTitle();
+bullishd.HideBubble();
+
+def countBull = if bullCond[-1] then countBull[1] + 1 else countBull[1];
+def recentBull = countBull == HighestAll(countBull);
+def secLow = HighestAll(if bullCond[-1] and recentBull then ind else Double.NaN);
+#def firstLow = highestAll(if bullCond and recentBull and ind[1] == secLow then loInd[1] else double.NaN);
+def FL_bar = HighestAll(if recentBull and bullCond[-1] and ind == secLow then GetValue(BarNumber(), loBars) else Double.NaN);
+
+plot bullTrendline =
+    if
+        recentBull and bullCond[-1] and ind == secLow
+    then
+        Min(ind[1], ind[0])
+    else
+        if
+#            pivotBottom and loInd == firstLow
+            FL_bar == BarNumber()
+        then
+            ind[0]
+        else
+            Double.NaN;
+bullTrendline.EnableApproximation();
+bullTrendline.SetDefaultColor(Color.GREEN);
+bullTrendline.SetLineWeight(4);
+bullTrendline.HideBubble();
+bullTrendline.HideTitle();
+
+# STRATEGY
+# A divergence signal is evaluated at the close of its bar and filled at the
+# following bar's open. Opposite signals reverse the current position.
+
+def strategyPosition = CompoundValue(
+    1,
+    if bullCond[1] then 1
+    else if bearCond[1] then -1
+    else strategyPosition[1],
+    0
+);
+
+def longOrder = bullCond and strategyPosition != 1;
+def shortOrder = bearCond and strategyPosition != -1;
+
+AddOrder(
+    OrderType.BUY_AUTO,
+    longOrder,
+    open[-1],
+    tradeSize,
+    Color.GREEN,
+    Color.GREEN,
+    "Bull Long"
+);
+
+AddOrder(
+    OrderType.SELL_AUTO,
+    shortOrder,
+    open[-1],
+    tradeSize,
+    Color.RED,
+    Color.RED,
+    "Bear Short"
+);
+
+# PERFORMANCE STATISTICS
+# Execution events are shifted one bar so these calculations occur on the same
+# bar whose open is used by AddOrder.
+
+def longExecution = longOrder[1];
+def shortExecution = shortOrder[1];
+def closesTrade =
+    (longExecution and strategyPosition[1] == -1) or
+    (shortExecution and strategyPosition[1] == 1);
+
+def entryPrice = CompoundValue(
+    1,
+    if longExecution or shortExecution then open
+    else entryPrice[1],
+    0
+);
+
+def closedTradePL =
+    if !closesTrade then 0
+    else if strategyPosition[1] == 1
+         then (open - entryPrice[1]) * tradeSize
+         else (entryPrice[1] - open) * tradeSize;
+
+def totalTrades = CompoundValue(
+    1,
+    totalTrades[1] + (if closesTrade then 1 else 0),
+    0
+);
+def winningTrades = CompoundValue(
+    1,
+    winningTrades[1] + (if closesTrade and closedTradePL > 0 then 1 else 0),
+    0
+);
+def losingTrades = CompoundValue(
+    1,
+    losingTrades[1] + (if closesTrade and closedTradePL < 0 then 1 else 0),
+    0
+);
+def grossWins = CompoundValue(
+    1,
+    grossWins[1] + (if closesTrade and closedTradePL > 0 then closedTradePL else 0),
+    0
+);
+def grossLosses = CompoundValue(
+    1,
+    grossLosses[1] + (if closesTrade and closedTradePL < 0 then closedTradePL else 0),
+    0
+);
+def realizedPL = CompoundValue(
+    1,
+    realizedPL[1] + closedTradePL,
+    0
+);
+
+def winPercent =
+    if totalTrades > 0 then 100 * winningTrades / totalTrades else 0;
+def averageWin =
+    if winningTrades > 0 then grossWins / winningTrades else 0;
+def averageLoss =
+    if losingTrades > 0 then grossLosses / losingTrades else 0;
+def averageTrade =
+    if totalTrades > 0 then realizedPL / totalTrades else 0;
+
+# Drawdown uses marked-to-market equity at each bar close, so adverse movement
+# inside an open trade is represented instead of only measuring closed trades.
+def openPL =
+    if strategyPosition == 1 then (close - entryPrice) * tradeSize
+    else if strategyPosition == -1 then (entryPrice - close) * tradeSize
+    else 0;
+def equity = initialCapital + realizedPL + openPL;
+def equityPeak = CompoundValue(1, Max(equityPeak[1], equity), initialCapital);
+def drawdown = Max(0, equityPeak - equity);
+def drawdownPercent =
+    if equityPeak > 0 then 100 * drawdown / equityPeak else 0;
+def maxDrawdown = CompoundValue(1, Max(maxDrawdown[1], drawdown), 0);
+def maxDrawdownPercent = CompoundValue(
+    1,
+    Max(maxDrawdownPercent[1], drawdownPercent),
+    0
+);
+
+AddLabel(yes, "Trades: " + totalTrades, Color.LIGHT_GRAY);
+AddLabel(
+    yes,
+    "P/L: $" + Round(realizedPL, 2),
+    if realizedPL > 0 then Color.GREEN
+    else if realizedPL < 0 then Color.RED
+    else Color.GRAY
+);
+AddLabel(yes, "Win: " + Round(winPercent, 1) + "%", Color.LIGHT_GRAY);
+AddLabel(yes, "Avg Win: $" + Round(averageWin, 2), Color.GREEN);
+AddLabel(yes, "Avg Loss: $" + Round(averageLoss, 2), Color.RED);
+AddLabel(
+    yes,
+    "Avg Trade: $" + Round(averageTrade, 2),
+    if averageTrade > 0 then Color.GREEN
+    else if averageTrade < 0 then Color.RED
+    else Color.GRAY
+);
+AddLabel(yes, "Max DD: $" + Round(maxDrawdown, 2), Color.RED);
+AddLabel(yes, "Max DD: " + Round(maxDrawdownPercent, 1) + "%", Color.RED);

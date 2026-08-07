@@ -1,0 +1,171 @@
+#
+# Weis Wave upper-chart companion
+#
+# Draws ZigZag price waves and optionally labels them with cumulative volume,
+# a running bar number, or the completed wave's total bar count.
+#
+# Pair this study with uts_weiswave_zigzag_volume.thinkscript and use the same
+# reversal settings in both. The separate uts_weiswave_volume.thinkscript uses
+# LazyBear's close-breakout wave algorithm, so its wave boundaries can differ.
+#
+# ZigZag pivots are provisional until price reverses by the configured amount,
+# so the current wave can move as new bars arrive.
+#
+
+declare upper;
+
+input price = hlc3;
+input reversalSizing = {default atr, manual};
+input manualReversalAmount = 1.0;
+input reversalMode = {default price, percent};
+input atrLength = 20;
+input atrMultiplier = 1.0;
+input atrAverageType = AverageType.EXPONENTIAL;
+input displayMode = {default volume, barNumber, barTotal, none};
+input paintBars = no;
+input showAtrLabel = yes;
+input usePurplePinkWaveColors = yes;
+input useDashedWaveLine = yes;
+input waveLineWeight = 2;
+
+Assert(manualReversalAmount > 0,
+    "'manual reversal amount' should be positive: " + manualReversalAmount);
+Assert(atrLength > 0, "'ATR length' should be positive: " + atrLength);
+Assert(atrMultiplier > 0,
+    "'ATR multiplier' should be positive: " + atrMultiplier);
+
+def usesPriceReversal = reversalMode == reversalMode.price;
+def atr = MovingAverage(
+    atrAverageType,
+    TrueRange(high, close, low),
+    atrLength
+);
+def atrPercent = if close != 0 then 100 * atr / close else 0;
+def reversalAmount = if reversalSizing == reversalSizing.atr
+    then atrMultiplier * (if usesPriceReversal then atr else atrPercent)
+    else manualReversalAmount;
+def zigZagTrend = if usesPriceReversal
+    then ZigZagTrendSign(price = price, reversalAmount = reversalAmount)
+    else ZigZagTrendPercent(price = price, reversalAmount = reversalAmount);
+def zigZagValue = if usesPriceReversal
+    then ZigZagSign(price = price, reversalAmount = reversalAmount)
+    else ZigZagPercent(price = price, reversalAmount = reversalAmount);
+def isInflection = !IsNaN(zigZagValue);
+
+# ZigZagTrend reports the direction entering a pivot. Invert it to identify
+# the wave leaving that pivot.
+def waveDirection = CompoundValue(1,
+    if isInflection and zigZagTrend == -1 then 1
+    else if isInflection and zigZagTrend == 1 then -1
+    else waveDirection[1],
+    0);
+def startsUpWave = isInflection and waveDirection == 1;
+def startsDownWave = isInflection and waveDirection == -1;
+def isUpCandle = close > open;
+def isDownCandle = close < open;
+
+# ThinkScript plot colors do not support alpha transparency. Violet/pink remain
+# visible on a black chart, while the gaps in a short-dashed line let more of
+# the underlying candles show through.
+plot wave = if !useDashedWaveLine then zigZagValue else Double.NaN;
+wave.EnableApproximation();
+wave.AssignValueColor(
+    if waveDirection[1] == 1
+        then if usePurplePinkWaveColors then Color.VIOLET else Color.GREEN
+    else if usePurplePinkWaveColors then Color.PINK else Color.RED
+);
+wave.SetLineWeight(waveLineWeight);
+
+plot dashedWave = if useDashedWaveLine then zigZagValue else Double.NaN;
+dashedWave.EnableApproximation();
+dashedWave.AssignValueColor(
+    if waveDirection[1] == 1
+        then if usePurplePinkWaveColors then Color.VIOLET else Color.GREEN
+    else if usePurplePinkWaveColors then Color.PINK else Color.RED
+);
+dashedWave.SetStyle(Curve.SHORT_DASH);
+dashedWave.SetLineWeight(waveLineWeight);
+
+AssignPriceColor(
+    if !paintBars then Color.CURRENT
+    else if waveDirection == 1 then Color.DARK_GREEN
+    else if waveDirection == -1 then Color.DOWNTICK
+    else Color.CURRENT
+);
+AddLabel(
+    showAtrLabel,
+    "ATR(" + atrLength + "): " + AsPercent(atrPercent / 100),
+    Color.LIGHT_GRAY
+);
+
+# On an inflection bar, candle direction decides whether that bar belongs to
+# the completed wave or the newly starting wave. This preserves the original
+# study's treatment of reversal-bar volume and bar counts.
+def upWaveVolume = CompoundValue(1,
+    if startsUpWave and isUpCandle then volume
+    else if startsUpWave then 0
+    else if waveDirection == 1 or (startsDownWave and !isDownCandle)
+        then upWaveVolume[1] + volume
+    else 0,
+    0);
+def downWaveVolume = CompoundValue(1,
+    if startsDownWave and isDownCandle then volume
+    else if startsDownWave then 0
+    else if waveDirection == -1 or (startsUpWave and !isUpCandle)
+        then downWaveVolume[1] + volume
+    else 0,
+    0);
+
+def barsUp = CompoundValue(1,
+    if startsUpWave and isUpCandle then 1
+    else if startsUpWave then 0
+    else if waveDirection == 1 or (startsDownWave and !isDownCandle)
+        then barsUp[1] + 1
+    else 0,
+    0);
+def barsDown = CompoundValue(1,
+    if startsDownWave and isDownCandle then 1
+    else if startsDownWave then 0
+    else if waveDirection == -1 or (startsUpWave and !isUpCandle)
+        then barsDown[1] + 1
+    else 0,
+    0);
+
+def completedUpWave = barsDown == 1 and barsUp == 0;
+def completedDownWave = barsUp == 1 and barsDown == 0;
+
+plot uCount = if displayMode == displayMode.barNumber and barsUp > 0
+    then barsUp
+    else Double.NaN;
+uCount.SetPaintingStrategy(PaintingStrategy.VALUES_BELOW);
+uCount.SetDefaultColor(Color.DARK_GREEN);
+
+plot dCount = if displayMode == displayMode.barNumber and barsDown > 0
+    then barsDown
+    else Double.NaN;
+dCount.SetPaintingStrategy(PaintingStrategy.VALUES_ABOVE);
+dCount.SetDefaultColor(Color.RED);
+
+plot uCountTot = if displayMode == displayMode.barTotal and completedUpWave
+    then barsUp[1]
+    else Double.NaN;
+uCountTot.SetPaintingStrategy(PaintingStrategy.VALUES_ABOVE);
+uCountTot.SetDefaultColor(Color.DARK_GREEN);
+
+plot dCountTot = if displayMode == displayMode.barTotal and completedDownWave
+    then barsDown[1]
+    else Double.NaN;
+dCountTot.SetPaintingStrategy(PaintingStrategy.VALUES_BELOW);
+dCountTot.SetDefaultColor(Color.RED);
+
+plot uVol = if displayMode == displayMode.volume and completedUpWave
+    then upWaveVolume[1]
+    else Double.NaN;
+uVol.SetPaintingStrategy(PaintingStrategy.VALUES_ABOVE);
+uVol.SetDefaultColor(Color.DARK_GREEN);
+
+plot dVol = if displayMode == displayMode.volume and completedDownWave
+    then downWaveVolume[1]
+    else Double.NaN;
+dVol.SetPaintingStrategy(PaintingStrategy.VALUES_BELOW);
+dVol.SetDefaultColor(Color.RED);

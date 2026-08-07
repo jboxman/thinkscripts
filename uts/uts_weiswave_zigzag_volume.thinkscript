@@ -1,0 +1,99 @@
+#
+# Weis Wave ZigZag Volume
+#
+# Lower-panel companion to uts_weiswave_zigzag.thinkscript. Both studies must
+# use the same price, reversal sizing, reversal mode, and ATR settings for their
+# wave boundaries to match.
+#
+# ZigZag pivots are provisional until price reverses by the configured amount,
+# so the current wave and its accumulated volume can change as new bars arrive.
+#
+
+declare lower;
+declare zerobase;
+
+input price = hlc3;
+input reversalSizing = {default atr, manual};
+input manualReversalAmount = 1.0;
+input reversalMode = {default price, percent};
+input atrLength = 20;
+input atrMultiplier = 1.0;
+input atrAverageType = AverageType.EXPONENTIAL;
+input paintBars = no;
+input showAtrLabel = yes;
+
+Assert(manualReversalAmount > 0,
+    "'manual reversal amount' should be positive: " + manualReversalAmount);
+Assert(atrLength > 0, "'ATR length' should be positive: " + atrLength);
+Assert(atrMultiplier > 0,
+    "'ATR multiplier' should be positive: " + atrMultiplier);
+
+def usesPriceReversal = reversalMode == reversalMode.price;
+def atr = MovingAverage(
+    atrAverageType,
+    TrueRange(high, close, low),
+    atrLength
+);
+def atrPercent = if close != 0 then 100 * atr / close else 0;
+def reversalAmount = if reversalSizing == reversalSizing.atr
+    then atrMultiplier * (if usesPriceReversal then atr else atrPercent)
+    else manualReversalAmount;
+
+def zigZagTrend = if usesPriceReversal
+    then ZigZagTrendSign(price = price, reversalAmount = reversalAmount)
+    else ZigZagTrendPercent(price = price, reversalAmount = reversalAmount);
+def zigZagValue = if usesPriceReversal
+    then ZigZagSign(price = price, reversalAmount = reversalAmount)
+    else ZigZagPercent(price = price, reversalAmount = reversalAmount);
+def isInflection = !IsNaN(zigZagValue);
+
+# ZigZagTrend reports the direction entering a pivot. Invert it to identify
+# the wave leaving that pivot.
+def waveDirection = CompoundValue(1,
+    if isInflection and zigZagTrend == -1 then 1
+    else if isInflection and zigZagTrend == 1 then -1
+    else waveDirection[1],
+    0);
+def startsUpWave = isInflection and waveDirection == 1;
+def startsDownWave = isInflection and waveDirection == -1;
+def isUpCandle = close > open;
+def isDownCandle = close < open;
+
+# On an inflection bar, candle direction decides whether that bar belongs to
+# the completed wave or the newly starting wave.
+def upWaveVolume = CompoundValue(1,
+    if startsUpWave and isUpCandle then volume
+    else if startsUpWave then 0
+    else if waveDirection == 1 or (startsDownWave and !isDownCandle)
+        then upWaveVolume[1] + volume
+    else 0,
+    0);
+def downWaveVolume = CompoundValue(1,
+    if startsDownWave and isDownCandle then volume
+    else if startsDownWave then 0
+    else if waveDirection == -1 or (startsUpWave and !isUpCandle)
+        then downWaveVolume[1] + volume
+    else 0,
+    0);
+
+plot upVol = upWaveVolume;
+plot downVol = downWaveVolume;
+
+upVol.SetDefaultColor(Color.DARK_GREEN);
+downVol.SetDefaultColor(Color.DOWNTICK);
+upVol.SetPaintingStrategy(PaintingStrategy.HISTOGRAM);
+downVol.SetPaintingStrategy(PaintingStrategy.HISTOGRAM);
+upVol.SetLineWeight(5);
+downVol.SetLineWeight(5);
+
+AssignPriceColor(
+    if !paintBars then Color.CURRENT
+    else if waveDirection == 1 then Color.DARK_GREEN
+    else if waveDirection == -1 then Color.DOWNTICK
+    else Color.CURRENT
+);
+AddLabel(
+    showAtrLabel,
+    "ATR(" + atrLength + "): " + AsPercent(atrPercent / 100),
+    Color.LIGHT_GRAY
+);

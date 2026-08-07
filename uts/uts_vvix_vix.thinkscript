@@ -1,0 +1,49 @@
+# https://usethinkscript.com/threads/spx-correlation-with-hyg-for-thinkorswim.20469/
+
+# VVIX / VIX Ratio Indicator
+#
+# Compares volatility-of-volatility (VVIX) with expected S&P 500 volatility
+# (VIX). Higher readings indicate that VVIX is elevated relative to VIX, while
+# lower readings indicate that VIX is elevated relative to VVIX. The reference
+# levels provide historical context only; neither extreme is a standalone
+# measure of market risk or a trading signal.
+#
+declare lower;
+
+input vixSymbol = "VIX";
+input vvixSymbol = "VVIX";
+input upperThreshold = 9.0;
+input lowerThreshold = 6.0;
+
+def vix = close(symbol = vixSymbol);
+def vvix = close(symbol = vvixSymbol);
+
+# Ratio calculation
+def ratio =
+    if !IsNaN(vix) and !IsNaN(vvix) and vix > 0
+    then vvix / vix
+    else Double.NaN;
+
+# Plot ratio
+plot VVIX_VIX_Ratio = ratio;
+VVIX_VIX_Ratio.SetDefaultColor(Color.YELLOW);
+VVIX_VIX_Ratio.SetLineWeight(2);
+
+# Reference levels
+plot UpperReference = upperThreshold;
+UpperReference.SetDefaultColor(Color.RED);
+UpperReference.SetStyle(Curve.SHORT_DASH);
+
+plot LowerReference = lowerThreshold;
+LowerReference.SetDefaultColor(Color.GREEN);
+LowerReference.SetStyle(Curve.SHORT_DASH);
+
+# Labels
+AddLabel(
+    yes,
+    "VVIX/VIX Ratio: " + AsText(Round(ratio, 2)),
+    if IsNaN(ratio) then Color.GRAY
+    else if ratio > upperThreshold then Color.RED
+    else if ratio < lowerThreshold then Color.GREEN
+    else Color.YELLOW
+);

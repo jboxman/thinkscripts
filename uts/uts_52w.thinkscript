@@ -1,0 +1,6 @@
+# Mobius© WLC Percent Inside 52 Week Range
+def h = highest(high, 252);
+def l = lowest(low, 252);
+def x = (close - l) / (h - l); 
+plot r = round(x * 100, 0);
+#End Code

@@ -1,0 +1,60 @@
+#
+# Six-Month Relative-Strength Range Position
+# ------------------------------------------
+# Custom quote/watchlist column that compares the current row's symbol with
+# a benchmark (ITOT by default). RelativeStrength produces the price ratio
+# between the symbol and benchmark; this script locates today's ratio within
+# its trailing 126-bar range and displays the result on a 0-100 scale.
+#
+# A reading of 100 means the ratio is at its lookback high, while 0 means it
+# is at its lookback low. Although this calculation is sometimes called a
+# percentile or rank, it is min-max normalization: it does not count how many
+# observations fall above or below the current value. It is also not a
+# cross-sectional rank against other symbols or a six-month return.
+# Because the lookback is measured in chart bars, 126 represents roughly six
+# months only when the custom quote uses daily aggregation.
+#
+# Background colors:
+#   81-100 dark green
+#   61-80  green
+#   41-60  gray
+#   21-40  red
+#   0-20   dark red
+#
+# Based on RS_Rank, developed by G. Horschman (2019-08-28).
+#
+
+input benchmark = "ITOT";
+input lookbackBars = 126;
+
+def relativeStrengthValue = RelativeStrength(benchmark);
+def rangeLow = Lowest(relativeStrengthValue, lookbackBars);
+def rangeHigh = Highest(relativeStrengthValue, lookbackBars);
+def rangeWidth = rangeHigh - rangeLow;
+
+def relativeStrengthRangePosition =
+    if IsNaN(relativeStrengthValue) or
+       IsNaN(rangeLow) or
+       IsNaN(rangeHigh) or
+       rangeWidth == 0 then
+        Double.NaN
+    else
+        Round(100 * (relativeStrengthValue - rangeLow) / rangeWidth, 0);
+
+AddLabel(
+    yes,
+    if IsNaN(relativeStrengthRangePosition) then
+        "N/A"
+    else
+        AsText(relativeStrengthRangePosition),
+    Color.WHITE
+);
+
+AssignBackgroundColor(
+    if IsNaN(relativeStrengthRangePosition) then Color.BLACK
+    else if relativeStrengthRangePosition > 80 then Color.DARK_GREEN
+    else if relativeStrengthRangePosition > 60 then CreateColor(0, 175, 0)
+    else if relativeStrengthRangePosition > 40 then Color.GRAY
+    else if relativeStrengthRangePosition > 20 then CreateColor(220, 0, 0)
+    else CreateColor(150, 0, 0)
+);

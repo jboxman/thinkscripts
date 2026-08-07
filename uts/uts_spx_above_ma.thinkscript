@@ -1,0 +1,20 @@
+# Percent of SPX Stocks Above 50, 100, 200 SMA
+# Mobius
+# V01
+
+declare lower;
+
+plot "50" = close("$SPXA50R");
+     "50".SetDefaultColor(Color.Cyan);
+plot "100" = close("$SPXA100R");
+     "100".SetDefaultColor(Color.Orange);
+plot "200" = close("$SPXA200R");
+     "200".SetDefaultColor(Color.Green);
+def min = Min("50", Min("100", "200"));
+addCloud(min, 0, color.red);
+addCloud("50", "100", color.light_green, color.cyan);
+addCloud("100", "200", color.pink, color.blue);
+AddLabel(1, "Above 50: " + AsPercent("50"), "50".TakeValueColor());
+AddLabel(1, "Above 100: " + AsPercent("100"), "100".TakeValueColor());
+AddLabel(1, "Above 200: " + AsPercent("200"), "200".TakeValueColor());
+# End Code

@@ -1,0 +1,106 @@
+#
+# Chande Trend Meter Approximation
+# --------------------------------
+# Custom quote/scan value that combines several measures of trend strength:
+#
+# - High, low, and close positions within 20-, 50-, 75-, and 100-bar
+#   Bollinger Bands
+# - The close's 100-bar z-score
+# - 14-bar RSI
+# - The close's position within the 2-bar high-low channel
+#
+# The components are summed and then normalized to 0-100 using the highest
+# and lowest composite values available to the script. Higher readings imply
+# a stronger uptrend; lower readings imply a stronger downtrend. Common CTM
+# reference levels are 90, 80, 60, and 20.
+#
+# Important limitations:
+# - This is a community thinkScript approximation of the Chande Trend Meter,
+#   not the proprietary StockCharts implementation.
+# - HighestAll/LowestAll use every bar loaded for the selected aggregation.
+#   Therefore, the result is relative to each symbol's available history and
+#   is not a stable absolute score for comparing different symbols.
+# - Historical values can change when the loaded history or aggregation
+#   changes. Daily aggregation is the closest match to the published CTM's
+#   day-based horizons and requires at least 100 usable bars.
+#
+# Ported to thinkScript by Mobius; calculation attributed to Tushar Chande.
+#
+
+script NormalizeAllBars {
+    input value = close;
+    input minimum = 0;
+    input maximum = 100;
+
+    def highestValue = HighestAll(value);
+    def lowestValue = LowestAll(value);
+    def valueRange = highestValue - lowestValue;
+
+    plot normalizedValue =
+        if IsNaN(value) or IsNaN(valueRange) or valueRange == 0 then
+            Double.NaN
+        else
+            minimum + (maximum - minimum) *
+                (value - lowestValue) / valueRange;
+}
+
+script BollingerPosition {
+    input price = close;
+    input length = 20;
+
+    def averagePrice = Average(price, length);
+    def standardDeviation = StDev(price, length);
+    def upperBand = averagePrice + 2 * standardDeviation;
+    def lowerBand = averagePrice - 2 * standardDeviation;
+    def bandWidth = upperBand - lowerBand;
+
+    plot position =
+        if IsNaN(price) or IsNaN(bandWidth) or bandWidth == 0 then
+            Double.NaN
+        else
+            10 * (price - lowerBand) / bandWidth;
+}
+
+def high20 = BollingerPosition(price = high, length = 20);
+def low20 = BollingerPosition(price = low, length = 20);
+def close20 = BollingerPosition(price = close, length = 20);
+
+def high50 = BollingerPosition(price = high, length = 50);
+def low50 = BollingerPosition(price = low, length = 50);
+def close50 = BollingerPosition(price = close, length = 50);
+
+def high75 = BollingerPosition(price = high, length = 75);
+def low75 = BollingerPosition(price = low, length = 75);
+def close75 = BollingerPosition(price = close, length = 75);
+
+def high100 = BollingerPosition(price = high, length = 100);
+def low100 = BollingerPosition(price = low, length = 100);
+def close100 = BollingerPosition(price = close, length = 100);
+
+def close100Average = Average(close, 100);
+def close100Deviation = StDev(close, 100);
+def zScoreComponent =
+    if IsNaN(close100Deviation) or close100Deviation == 0 then
+        Double.NaN
+    else
+        10 * (close - close100Average) / close100Deviation;
+
+def rsiComponent = RSI(price = close, length = 14) / 10;
+
+def channelLow = Lowest(low, 2);
+def channelHigh = Highest(high, 2);
+def channelWidth = channelHigh - channelLow;
+def priceChannelComponent =
+    if IsNaN(channelWidth) or channelWidth == 0 then
+        Double.NaN
+    else
+        10 * (close - channelLow) / channelWidth;
+
+def compositeScore =
+    high20 + low20 + close20 +
+    high50 + low50 + close50 +
+    high75 + low75 + close75 +
+    high100 + low100 + close100 +
+    zScoreComponent + rsiComponent + priceChannelComponent;
+
+plot CTM = NormalizeAllBars(compositeScore);
