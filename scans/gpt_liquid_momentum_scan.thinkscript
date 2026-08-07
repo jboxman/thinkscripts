@@ -1,0 +1,48 @@
+# Liquid Momentum Stock Hacker Scan
+#
+# IMPORTANT: Set the custom study filter's aggregation period to Day.
+# Select the desired US-stock universe with Stock Hacker's "Scan in" menu;
+# thinkScript cannot determine a security's listing country reliably.
+#
+# ADR% is the 20-day average of each day's (high - low) / low * 100.
+# "70% above the 52-week low" means close >= 1.70 * the 252-day low.
+# Today's dollar volume is incomplete until the regular session closes.
+
+input minimumPrice = 10.00;
+input adrLength = 20;
+input minimumADRPercent = 4.00;
+input lowLookback = 252;
+input minimumPercentAboveLow = 70.00;
+input averageVolumeLength = 30;
+input minimumAverageDollarVolume = 10000000;
+input minimumCurrentDollarVolume = 10000000;
+input fastEMALength = 9;
+input slowEMALength = 21;
+input trendEMALength = 50;
+
+def dailyRangePercent =
+    if low > 0
+    then 100 * (high - low) / low
+    else 0;
+def adrPercent = Average(dailyRangePercent, adrLength);
+
+def low52Week = Lowest(low, lowLookback);
+def requiredPriceAboveLow =
+    low52Week * (1 + minimumPercentAboveLow / 100);
+
+# These intentionally follow the requested Price * Volume definitions.
+def averageDollarVolume = close * Average(volume, averageVolumeLength);
+def currentDollarVolume = close * volume;
+
+def emaFast = ExpAverage(close, fastEMALength);
+def emaSlow = ExpAverage(close, slowEMALength);
+def emaTrend = ExpAverage(close, trendEMALength);
+
+plot scan =
+    close > minimumPrice and
+    adrPercent > minimumADRPercent and
+    close >= requiredPriceAboveLow and
+    averageDollarVolume > minimumAverageDollarVolume and
+    currentDollarVolume > minimumCurrentDollarVolume and
+    emaFast > emaSlow and
+    close > emaTrend;
