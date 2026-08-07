@@ -127,70 +127,70 @@ Utilities.SetDefaultColor(Color.LIME);
 REITs.SetDefaultColor(Color.LIGHT_RED);
 RealEstateMgmt.SetDefaultColor(Color.PINK);
 
-AddLabel(showLabels and !IsNaN(Energy), "Energy " + AsText(Round(Energy, 1)), Color.RED);
-AddLabel(showLabels and !IsNaN(Materials), "Materials " + AsText(Round(Materials, 1)), Color.ORANGE);
-AddLabel(showLabels and !IsNaN(CapitalGoods), "Capital goods " + AsText(Round(CapitalGoods, 1)), Color.YELLOW);
-AddLabel(showLabels and !IsNaN(CommercialServices), "Commercial svcs " + AsText(Round(CommercialServices, 1)), Color.LIGHT_ORANGE);
-AddLabel(showLabels and !IsNaN(Transportation), "Transportation " + AsText(Round(Transportation, 1)), Color.GREEN);
+AddLabel(showLabels and !IsNaN(Energy), "EN Energy " + AsText(Round(Energy, 1)), Color.RED);
+AddLabel(showLabels and !IsNaN(Materials), "MAT Materials " + AsText(Round(Materials, 1)), Color.ORANGE);
+AddLabel(showLabels and !IsNaN(CapitalGoods), "IND Capital " + AsText(Round(CapitalGoods, 1)), Color.YELLOW);
+AddLabel(showLabels and !IsNaN(CommercialServices), "IND Comm svcs " + AsText(Round(CommercialServices, 1)), Color.LIGHT_ORANGE);
+AddLabel(showLabels and !IsNaN(Transportation), "IND Transport " + AsText(Round(Transportation, 1)), Color.GREEN);
 
-AddLabel(showLabels and !IsNaN(Autos), "Autos " + AsText(Round(Autos, 1)), Color.MAGENTA);
-AddLabel(showLabels and !IsNaN(DurablesApparel), "Durables/apparel " + AsText(Round(DurablesApparel, 1)), Color.PINK);
-AddLabel(showLabels and !IsNaN(ConsumerServices), "Consumer svcs " + AsText(Round(ConsumerServices, 1)), Color.PLUM);
-AddLabel(showLabels and !IsNaN(DiscRetail), "Disc retail " + AsText(Round(DiscRetail, 1)), Color.VIOLET);
+AddLabel(showLabels and !IsNaN(Autos), "CD Autos " + AsText(Round(Autos, 1)), Color.MAGENTA);
+AddLabel(showLabels and !IsNaN(DurablesApparel), "CD Durables " + AsText(Round(DurablesApparel, 1)), Color.PINK);
+AddLabel(showLabels and !IsNaN(ConsumerServices), "CD Cons svcs " + AsText(Round(ConsumerServices, 1)), Color.PLUM);
+AddLabel(showLabels and !IsNaN(DiscRetail), "CD Disc retail " + AsText(Round(DiscRetail, 1)), Color.VIOLET);
 
-AddLabel(showLabels and !IsNaN(StaplesRetail), "Staples retail " + AsText(Round(StaplesRetail, 1)), Color.LIME);
-AddLabel(showLabels and !IsNaN(FoodBevTobacco), "Food/bev/tobacco " + AsText(Round(FoodBevTobacco, 1)), Color.LIGHT_GREEN);
-AddLabel(showLabels and !IsNaN(HouseholdPersonal), "Household/personal " + AsText(Round(HouseholdPersonal, 1)), Color.DARK_GREEN);
+AddLabel(showLabels and !IsNaN(StaplesRetail), "CS Staples " + AsText(Round(StaplesRetail, 1)), Color.LIME);
+AddLabel(showLabels and !IsNaN(FoodBevTobacco), "CS Food/bev " + AsText(Round(FoodBevTobacco, 1)), Color.LIGHT_GREEN);
+AddLabel(showLabels and !IsNaN(HouseholdPersonal), "CS Household " + AsText(Round(HouseholdPersonal, 1)), Color.DARK_GREEN);
 
-AddLabel(showLabels and !IsNaN(HealthCareServices), "HC services " + AsText(Round(HealthCareServices, 1)), Color.VIOLET);
-AddLabel(showLabels and !IsNaN(PharmaBiotech), "Pharma/biotech " + AsText(Round(PharmaBiotech, 1)), Color.PLUM);
+AddLabel(showLabels and !IsNaN(HealthCareServices), "HC HC svcs " + AsText(Round(HealthCareServices, 1)), Color.VIOLET);
+AddLabel(showLabels and !IsNaN(PharmaBiotech), "HC Pharma " + AsText(Round(PharmaBiotech, 1)), Color.PLUM);
 
-AddLabel(showLabels and !IsNaN(Banks), "Banks " + AsText(Round(Banks, 1)), Color.CYAN);
-AddLabel(showLabels and !IsNaN(FinancialServices), "Financial svcs " + AsText(Round(FinancialServices, 1)), GlobalColor("TechBlue"));
-AddLabel(showLabels and !IsNaN(Insurance), "Insurance " + AsText(Round(Insurance, 1)), Color.BLUE);
+AddLabel(showLabels and !IsNaN(Banks), "FIN Banks " + AsText(Round(Banks, 1)), Color.CYAN);
+AddLabel(showLabels and !IsNaN(FinancialServices), "FIN Fin svcs " + AsText(Round(FinancialServices, 1)), GlobalColor("TechBlue"));
+AddLabel(showLabels and !IsNaN(Insurance), "FIN Insurance " + AsText(Round(Insurance, 1)), Color.BLUE);
 
-AddLabel(showLabels and !IsNaN(SoftwareServices), "Software " + AsText(Round(SoftwareServices, 1)), GlobalColor("SkyBlue"));
-AddLabel(showLabels and !IsNaN(TechHardware), "Hardware " + AsText(Round(TechHardware, 1)), GlobalColor("TechBlue"));
-AddLabel(showLabels and !IsNaN(Semis), "Semis " + AsText(Round(Semis, 1)), GlobalColor("LightBlue"));
+AddLabel(showLabels and !IsNaN(SoftwareServices), "IT Software " + AsText(Round(SoftwareServices, 1)), GlobalColor("SkyBlue"));
+AddLabel(showLabels and !IsNaN(TechHardware), "IT Hardware " + AsText(Round(TechHardware, 1)), GlobalColor("TechBlue"));
+AddLabel(showLabels and !IsNaN(Semis), "IT Semis " + AsText(Round(Semis, 1)), GlobalColor("LightBlue"));
 
-AddLabel(showLabels and !IsNaN(Telecom), "Telecom " + AsText(Round(Telecom, 1)), Color.LIGHT_GRAY);
-AddLabel(showLabels and !IsNaN(MediaEntertainment), "Media/ent " + AsText(Round(MediaEntertainment, 1)), Color.WHITE);
+AddLabel(showLabels and !IsNaN(Telecom), "COM Telecom " + AsText(Round(Telecom, 1)), Color.LIGHT_GRAY);
+AddLabel(showLabels and !IsNaN(MediaEntertainment), "COM Media " + AsText(Round(MediaEntertainment, 1)), Color.WHITE);
 
-AddLabel(showLabels and !IsNaN(Utilities), "Utilities " + AsText(Round(Utilities, 1)), Color.LIME);
-AddLabel(showLabels and !IsNaN(REITs), "REITs " + AsText(Round(REITs, 1)), Color.LIGHT_RED);
-AddLabel(showLabels and !IsNaN(RealEstateMgmt), "RE mgmt " + AsText(Round(RealEstateMgmt, 1)), Color.PINK);
+AddLabel(showLabels and !IsNaN(Utilities), "UTIL Utilities " + AsText(Round(Utilities, 1)), Color.LIME);
+AddLabel(showLabels and !IsNaN(REITs), "RE REITs " + AsText(Round(REITs, 1)), Color.LIGHT_RED);
+AddLabel(showLabels and !IsNaN(RealEstateMgmt), "RE RE mgmt " + AsText(Round(RealEstateMgmt, 1)), Color.PINK);
 
 def lastBar = !IsNaN(close) and IsNaN(close[-1]);
 
-AddChartBubble(showBubbles and showSectorBubblesEnergy and lastBar and !IsNaN(Energy), Energy, "Energy " + AsText(Round(Energy, 1)), Color.RED, yes);
-AddChartBubble(showBubbles and showSectorBubblesMaterials and lastBar and !IsNaN(Materials), Materials, "Materials " + AsText(Round(Materials, 1)), Color.ORANGE, yes);
-AddChartBubble(showBubbles and showSectorBubblesIndustrials and lastBar and !IsNaN(CapitalGoods), CapitalGoods, "Capital " + AsText(Round(CapitalGoods, 1)), Color.YELLOW, yes);
-AddChartBubble(showBubbles and showSectorBubblesIndustrials and lastBar and !IsNaN(CommercialServices), CommercialServices, "Comm svcs " + AsText(Round(CommercialServices, 1)), Color.LIGHT_ORANGE, yes);
-AddChartBubble(showBubbles and showSectorBubblesIndustrials and lastBar and !IsNaN(Transportation), Transportation, "Transport " + AsText(Round(Transportation, 1)), Color.GREEN, yes);
+AddChartBubble(showBubbles and showSectorBubblesEnergy and lastBar and !IsNaN(Energy), Energy, "EN Energy " + AsText(Round(Energy, 1)), Color.RED, yes);
+AddChartBubble(showBubbles and showSectorBubblesMaterials and lastBar and !IsNaN(Materials), Materials, "MAT Materials " + AsText(Round(Materials, 1)), Color.ORANGE, yes);
+AddChartBubble(showBubbles and showSectorBubblesIndustrials and lastBar and !IsNaN(CapitalGoods), CapitalGoods, "IND Capital " + AsText(Round(CapitalGoods, 1)), Color.YELLOW, yes);
+AddChartBubble(showBubbles and showSectorBubblesIndustrials and lastBar and !IsNaN(CommercialServices), CommercialServices, "IND Comm svcs " + AsText(Round(CommercialServices, 1)), Color.LIGHT_ORANGE, yes);
+AddChartBubble(showBubbles and showSectorBubblesIndustrials and lastBar and !IsNaN(Transportation), Transportation, "IND Transport " + AsText(Round(Transportation, 1)), Color.GREEN, yes);
 
-AddChartBubble(showBubbles and showSectorBubblesConsumerDiscretionary and lastBar and !IsNaN(Autos), Autos, "Autos " + AsText(Round(Autos, 1)), Color.MAGENTA, yes);
-AddChartBubble(showBubbles and showSectorBubblesConsumerDiscretionary and lastBar and !IsNaN(DurablesApparel), DurablesApparel, "Durables " + AsText(Round(DurablesApparel, 1)), Color.PINK, yes);
-AddChartBubble(showBubbles and showSectorBubblesConsumerDiscretionary and lastBar and !IsNaN(ConsumerServices), ConsumerServices, "Consumer svcs " + AsText(Round(ConsumerServices, 1)), Color.PLUM, yes);
-AddChartBubble(showBubbles and showSectorBubblesConsumerDiscretionary and lastBar and !IsNaN(DiscRetail), DiscRetail, "Disc retail " + AsText(Round(DiscRetail, 1)), Color.VIOLET, yes);
+AddChartBubble(showBubbles and showSectorBubblesConsumerDiscretionary and lastBar and !IsNaN(Autos), Autos, "CD Autos " + AsText(Round(Autos, 1)), Color.MAGENTA, yes);
+AddChartBubble(showBubbles and showSectorBubblesConsumerDiscretionary and lastBar and !IsNaN(DurablesApparel), DurablesApparel, "CD Durables " + AsText(Round(DurablesApparel, 1)), Color.PINK, yes);
+AddChartBubble(showBubbles and showSectorBubblesConsumerDiscretionary and lastBar and !IsNaN(ConsumerServices), ConsumerServices, "CD Cons svcs " + AsText(Round(ConsumerServices, 1)), Color.PLUM, yes);
+AddChartBubble(showBubbles and showSectorBubblesConsumerDiscretionary and lastBar and !IsNaN(DiscRetail), DiscRetail, "CD Disc retail " + AsText(Round(DiscRetail, 1)), Color.VIOLET, yes);
 
-AddChartBubble(showBubbles and showSectorBubblesConsumerStaples and lastBar and !IsNaN(StaplesRetail), StaplesRetail, "Staples retail " + AsText(Round(StaplesRetail, 1)), Color.LIME, yes);
-AddChartBubble(showBubbles and showSectorBubblesConsumerStaples and lastBar and !IsNaN(FoodBevTobacco), FoodBevTobacco, "Food/bev " + AsText(Round(FoodBevTobacco, 1)), Color.LIGHT_GREEN, yes);
-AddChartBubble(showBubbles and showSectorBubblesConsumerStaples and lastBar and !IsNaN(HouseholdPersonal), HouseholdPersonal, "Household " + AsText(Round(HouseholdPersonal, 1)), Color.DARK_GREEN, yes);
+AddChartBubble(showBubbles and showSectorBubblesConsumerStaples and lastBar and !IsNaN(StaplesRetail), StaplesRetail, "CS Staples " + AsText(Round(StaplesRetail, 1)), Color.LIME, yes);
+AddChartBubble(showBubbles and showSectorBubblesConsumerStaples and lastBar and !IsNaN(FoodBevTobacco), FoodBevTobacco, "CS Food/bev " + AsText(Round(FoodBevTobacco, 1)), Color.LIGHT_GREEN, yes);
+AddChartBubble(showBubbles and showSectorBubblesConsumerStaples and lastBar and !IsNaN(HouseholdPersonal), HouseholdPersonal, "CS Household " + AsText(Round(HouseholdPersonal, 1)), Color.DARK_GREEN, yes);
 
-AddChartBubble(showBubbles and showSectorBubblesHealthCare and lastBar and !IsNaN(HealthCareServices), HealthCareServices, "HC svcs " + AsText(Round(HealthCareServices, 1)), Color.VIOLET, yes);
-AddChartBubble(showBubbles and showSectorBubblesHealthCare and lastBar and !IsNaN(PharmaBiotech), PharmaBiotech, "Pharma " + AsText(Round(PharmaBiotech, 1)), Color.PLUM, yes);
+AddChartBubble(showBubbles and showSectorBubblesHealthCare and lastBar and !IsNaN(HealthCareServices), HealthCareServices, "HC HC svcs " + AsText(Round(HealthCareServices, 1)), Color.VIOLET, yes);
+AddChartBubble(showBubbles and showSectorBubblesHealthCare and lastBar and !IsNaN(PharmaBiotech), PharmaBiotech, "HC Pharma " + AsText(Round(PharmaBiotech, 1)), Color.PLUM, yes);
 
-AddChartBubble(showBubbles and showSectorBubblesFinancials and lastBar and !IsNaN(Banks), Banks, "Banks " + AsText(Round(Banks, 1)), Color.CYAN, yes);
-AddChartBubble(showBubbles and showSectorBubblesFinancials and lastBar and !IsNaN(FinancialServices), FinancialServices, "Fin svcs " + AsText(Round(FinancialServices, 1)), GlobalColor("TechBlue"), yes);
-AddChartBubble(showBubbles and showSectorBubblesFinancials and lastBar and !IsNaN(Insurance), Insurance, "Insurance " + AsText(Round(Insurance, 1)), Color.BLUE, yes);
+AddChartBubble(showBubbles and showSectorBubblesFinancials and lastBar and !IsNaN(Banks), Banks, "FIN Banks " + AsText(Round(Banks, 1)), Color.CYAN, yes);
+AddChartBubble(showBubbles and showSectorBubblesFinancials and lastBar and !IsNaN(FinancialServices), FinancialServices, "FIN Fin svcs " + AsText(Round(FinancialServices, 1)), GlobalColor("TechBlue"), yes);
+AddChartBubble(showBubbles and showSectorBubblesFinancials and lastBar and !IsNaN(Insurance), Insurance, "FIN Insurance " + AsText(Round(Insurance, 1)), Color.BLUE, yes);
 
-AddChartBubble(showBubbles and showSectorBubblesInformationTechnology and lastBar and !IsNaN(SoftwareServices), SoftwareServices, "Software " + AsText(Round(SoftwareServices, 1)), GlobalColor("SkyBlue"), yes);
-AddChartBubble(showBubbles and showSectorBubblesInformationTechnology and lastBar and !IsNaN(TechHardware), TechHardware, "Hardware " + AsText(Round(TechHardware, 1)), GlobalColor("TechBlue"), yes);
-AddChartBubble(showBubbles and showSectorBubblesInformationTechnology and lastBar and !IsNaN(Semis), Semis, "Semis " + AsText(Round(Semis, 1)), GlobalColor("LightBlue"), yes);
+AddChartBubble(showBubbles and showSectorBubblesInformationTechnology and lastBar and !IsNaN(SoftwareServices), SoftwareServices, "IT Software " + AsText(Round(SoftwareServices, 1)), GlobalColor("SkyBlue"), yes);
+AddChartBubble(showBubbles and showSectorBubblesInformationTechnology and lastBar and !IsNaN(TechHardware), TechHardware, "IT Hardware " + AsText(Round(TechHardware, 1)), GlobalColor("TechBlue"), yes);
+AddChartBubble(showBubbles and showSectorBubblesInformationTechnology and lastBar and !IsNaN(Semis), Semis, "IT Semis " + AsText(Round(Semis, 1)), GlobalColor("LightBlue"), yes);
 
-AddChartBubble(showBubbles and showSectorBubblesCommunicationServices and lastBar and !IsNaN(Telecom), Telecom, "Telecom " + AsText(Round(Telecom, 1)), Color.LIGHT_GRAY, yes);
-AddChartBubble(showBubbles and showSectorBubblesCommunicationServices and lastBar and !IsNaN(MediaEntertainment), MediaEntertainment, "Media " + AsText(Round(MediaEntertainment, 1)), Color.WHITE, yes);
+AddChartBubble(showBubbles and showSectorBubblesCommunicationServices and lastBar and !IsNaN(Telecom), Telecom, "COM Telecom " + AsText(Round(Telecom, 1)), Color.LIGHT_GRAY, yes);
+AddChartBubble(showBubbles and showSectorBubblesCommunicationServices and lastBar and !IsNaN(MediaEntertainment), MediaEntertainment, "COM Media " + AsText(Round(MediaEntertainment, 1)), Color.WHITE, yes);
 
-AddChartBubble(showBubbles and showSectorBubblesUtilities and lastBar and !IsNaN(Utilities), Utilities, "Utilities " + AsText(Round(Utilities, 1)), Color.LIME, yes);
-AddChartBubble(showBubbles and showSectorBubblesRealEstate and lastBar and !IsNaN(REITs), REITs, "REITs " + AsText(Round(REITs, 1)), Color.LIGHT_RED, yes);
-AddChartBubble(showBubbles and showSectorBubblesRealEstate and lastBar and !IsNaN(RealEstateMgmt), RealEstateMgmt, "RE mgmt " + AsText(Round(RealEstateMgmt, 1)), Color.PINK, yes);
+AddChartBubble(showBubbles and showSectorBubblesUtilities and lastBar and !IsNaN(Utilities), Utilities, "UTIL Utilities " + AsText(Round(Utilities, 1)), Color.LIME, yes);
+AddChartBubble(showBubbles and showSectorBubblesRealEstate and lastBar and !IsNaN(REITs), REITs, "RE REITs " + AsText(Round(REITs, 1)), Color.LIGHT_RED, yes);
+AddChartBubble(showBubbles and showSectorBubblesRealEstate and lastBar and !IsNaN(RealEstateMgmt), RealEstateMgmt, "RE RE mgmt " + AsText(Round(RealEstateMgmt, 1)), Color.PINK, yes);
