@@ -1,0 +1,205 @@
+# Intraday Market Internals
+# Normalizes issue breadth, volume breadth, and TICK to percentage scales so
+# different market universes can be compared in one lower study.
+#
+# Intended for an INTRADAY chart during regular U.S. equity-market hours.
+
+declare lower;
+declare hide_on_daily;
+
+input market = {default SP500, NASDAQ100, RUSSELL2000, ALL_US, NYSE, NASDAQ};
+input regularSessionOnly = yes;
+input showIssueBreadth = yes;
+input showVolumeBreadth = yes;
+input showTickPercent = yes;
+input showAverageTickPercent = yes;
+
+def advances =
+    if market == market.SP500 then close("$ADVSPC")
+    else if market == market.NASDAQ100 then close("$ADVNDC")
+    else if market == market.RUSSELL2000 then close("$ADVRLC")
+    else if market == market.ALL_US then close("$ADVUSC")
+    else if market == market.NYSE then close("$ADVNC")
+    else close("$ADVNC/Q");
+
+def declines =
+    if market == market.SP500 then close("$DECLSPC")
+    else if market == market.NASDAQ100 then close("$DECLNDC")
+    else if market == market.RUSSELL2000 then close("$DECLRLC")
+    else if market == market.ALL_US then close("$DECLUSC")
+    else if market == market.NYSE then close("$DECNC")
+    else close("$DECNC/Q");
+
+def unchanged =
+    if market == market.SP500 then close("$UNCHSPC")
+    else if market == market.NASDAQ100 then close("$UNCHNDC")
+    else if market == market.RUSSELL2000 then close("$UNCHRLC")
+    else if market == market.ALL_US then close("$UNCHUSC")
+    else if market == market.NYSE then close("$UNCNC")
+    else close("$UNCNC/Q");
+
+def upVolume =
+    if market == market.SP500 then close("$UVOLSPC")
+    else if market == market.NASDAQ100 then close("$UVOLNDC")
+    else if market == market.RUSSELL2000 then close("$UVOLRLC")
+    else if market == market.ALL_US then close("$UVOLUSC")
+    else if market == market.NYSE then close("$UVOLC")
+    else close("$UVOLC/Q");
+
+def downVolume =
+    if market == market.SP500 then close("$DVOLSPC")
+    else if market == market.NASDAQ100 then close("$DVOLNDC")
+    else if market == market.RUSSELL2000 then close("$DVOLRLC")
+    else if market == market.ALL_US then close("$DVOLUSC")
+    else if market == market.NYSE then close("$DVOLC")
+    else close("$DVOLC/Q");
+
+def tickValue =
+    if market == market.SP500 then close("$TIKSPC")
+    else if market == market.NASDAQ100 then close("$TIKNDC")
+    else if market == market.RUSSELL2000 then close("$TIKRLC")
+    else if market == market.ALL_US then close("$TIKUSC")
+    else if market == market.NYSE then close("$TICKC")
+    else close("$TICKC/Q");
+
+def trinValue =
+    if market == market.SP500 then close("$TRINSPC")
+    else if market == market.NASDAQ100 then close("$TRINNDC")
+    else if market == market.RUSSELL2000 then close("$TRINRLC")
+    else if market == market.ALL_US then close("$TRINUSC")
+    else if market == market.NYSE then close("$TRINC")
+    else close("$TRINC/Q");
+
+def totalIssues = advances + declines + unchanged;
+def issueDenominator = advances + declines;
+def volumeDenominator = upVolume + downVolume;
+
+def issueBreadthPct =
+    if issueDenominator != 0
+    then 100 * (advances - declines) / issueDenominator
+    else Double.NaN;
+
+def volumeBreadthPct =
+    if volumeDenominator != 0
+    then 100 * (upVolume - downVolume) / volumeDenominator
+    else Double.NaN;
+
+def tickPct =
+    if totalIssues != 0
+    then 100 * tickValue / totalIssues
+    else Double.NaN;
+
+def inRegularSession =
+    SecondsFromTime(0930) >= 0 and SecondsTillTime(1600) > 0;
+def displayData = !regularSessionOnly or inRegularSession;
+def newSession = GetYYYYMMDD() != GetYYYYMMDD()[1];
+
+rec cumulativeTick =
+    if newSession then
+        if inRegularSession then tickValue else 0
+    else if inRegularSession then
+        cumulativeTick[1] + tickValue
+    else
+        cumulativeTick[1];
+
+rec sessionBars =
+    if newSession then
+        if inRegularSession then 1 else 0
+    else if inRegularSession then
+        sessionBars[1] + 1
+    else
+        sessionBars[1];
+
+def averageTickPct =
+    if sessionBars > 0 and totalIssues != 0
+    then 100 * (cumulativeTick / sessionBars) / totalIssues
+    else Double.NaN;
+
+plot IssueBreadth =
+    if displayData and showIssueBreadth then issueBreadthPct else Double.NaN;
+IssueBreadth.SetPaintingStrategy(PaintingStrategy.HISTOGRAM);
+IssueBreadth.SetLineWeight(3);
+IssueBreadth.AssignValueColor(
+    if issueBreadthPct > 10 then Color.GREEN
+    else if issueBreadthPct < -10 then Color.RED
+    else Color.GRAY
+);
+
+plot VolumeBreadth =
+    if displayData and showVolumeBreadth then volumeBreadthPct else Double.NaN;
+VolumeBreadth.SetDefaultColor(Color.YELLOW);
+VolumeBreadth.SetLineWeight(2);
+
+plot TickPercent =
+    if displayData and showTickPercent then tickPct else Double.NaN;
+TickPercent.SetDefaultColor(Color.CYAN);
+TickPercent.SetStyle(Curve.SHORT_DASH);
+
+plot AverageTickPercent =
+    if displayData and showAverageTickPercent then averageTickPct else Double.NaN;
+AverageTickPercent.SetDefaultColor(Color.MAGENTA);
+AverageTickPercent.SetLineWeight(2);
+
+plot ZeroLine = 0;
+ZeroLine.SetDefaultColor(Color.GRAY);
+ZeroLine.SetStyle(Curve.LONG_DASH);
+
+plot BroadPositive = 20;
+BroadPositive.SetDefaultColor(Color.DARK_GREEN);
+BroadPositive.SetStyle(Curve.SHORT_DASH);
+
+plot BroadNegative = -20;
+BroadNegative.SetDefaultColor(Color.DARK_RED);
+BroadNegative.SetStyle(Curve.SHORT_DASH);
+
+def issuePositive = issueBreadthPct > 10;
+def issueNegative = issueBreadthPct < -10;
+def volumePositive = volumeBreadthPct > 10;
+def volumeNegative = volumeBreadthPct < -10;
+def broadRiskOn = issuePositive and volumePositive;
+def broadRiskOff = issueNegative and volumeNegative;
+
+AddLabel(
+    yes,
+    if broadRiskOn then "BROAD RISK-ON"
+    else if broadRiskOff then "BROAD RISK-OFF"
+    else if issuePositive and volumeNegative then "RALLY: VOLUME NOT CONFIRMING"
+    else if issueNegative and volumePositive then "WEAK TAPE: POSITIVE VOLUME DIVERGENCE"
+    else "INTERNALS MIXED",
+    if broadRiskOn then Color.GREEN
+    else if broadRiskOff then Color.RED
+    else if issuePositive and volumeNegative then Color.ORANGE
+    else if issueNegative and volumePositive then Color.YELLOW
+    else Color.GRAY
+);
+
+AddLabel(
+    yes,
+    "ISSUES " + Round(issueBreadthPct, 1) + "%",
+    if issuePositive then Color.GREEN else if issueNegative then Color.RED else Color.GRAY
+);
+AddLabel(
+    yes,
+    "VOLUME " + Round(volumeBreadthPct, 1) + "%",
+    if volumePositive then Color.GREEN else if volumeNegative then Color.RED else Color.GRAY
+);
+AddLabel(
+    yes,
+    "A/D " + Round(if declines != 0 then advances / declines else 0, 2),
+    if advances > declines then Color.GREEN else if advances < declines then Color.RED else Color.GRAY
+);
+AddLabel(
+    yes,
+    "UP/DN VOL " + Round(if downVolume != 0 then upVolume / downVolume else 0, 2),
+    if upVolume > downVolume then Color.GREEN else if upVolume < downVolume then Color.RED else Color.GRAY
+);
+AddLabel(
+    yes,
+    "TICK " + Round(tickValue, 0) + "  CUM " + Round(cumulativeTick, 0),
+    if tickValue > 0 then Color.GREEN else if tickValue < 0 then Color.RED else Color.GRAY
+);
+AddLabel(
+    yes,
+    "TRIN " + Round(trinValue, 2),
+    if trinValue < 0.8 then Color.GREEN else if trinValue > 1.2 then Color.RED else Color.GRAY
+);

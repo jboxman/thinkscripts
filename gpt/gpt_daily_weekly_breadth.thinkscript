@@ -1,0 +1,179 @@
+# Daily / Weekly Market Breadth
+#
+# Displays:
+#   1. Daily normalized advance/decline breadth
+#   2. Rolling five-session average breadth
+#   3. Current calendar-week average breadth
+#
+# Apply this study to a DAILY chart. The weekly value is deliberately built
+# from the daily observations instead of relying on a weekly chart bar.
+
+declare lower;
+declare hide_on_intraday;
+declare zerobase;
+
+input market = {default SP500, NASDAQ100, RUSSELL2000, ALL_US, NYSE, NASDAQ};
+input fiveDayLength = 5;
+input broadParticipationLevel = 20;
+input showDailyBreadth = yes;
+input showFiveDayAverage = yes;
+input showCurrentWeekAverage = yes;
+input carryLastValidReading = yes;
+
+def isDailyChart = GetAggregationPeriod() == AggregationPeriod.DAY;
+
+def rawAdvances =
+    if market == market.SP500 then close("$ADVSPC")
+    else if market == market.NASDAQ100 then close("$ADVNDC")
+    else if market == market.RUSSELL2000 then close("$ADVRLC")
+    else if market == market.ALL_US then close("$ADVUSC")
+    else if market == market.NYSE then close("$ADVNC")
+    else close("$ADVNC/Q");
+
+def rawDeclines =
+    if market == market.SP500 then close("$DECLSPC")
+    else if market == market.NASDAQ100 then close("$DECLNDC")
+    else if market == market.RUSSELL2000 then close("$DECLRLC")
+    else if market == market.ALL_US then close("$DECLUSC")
+    else if market == market.NYSE then close("$DECNC")
+    else close("$DECNC/Q");
+
+def sourceDataAvailable = !IsNaN(rawAdvances) and !IsNaN(rawDeclines);
+
+rec lastValidAdvances =
+    if sourceDataAvailable then rawAdvances
+    else lastValidAdvances[1];
+
+rec lastValidDeclines =
+    if sourceDataAvailable then rawDeclines
+    else lastValidDeclines[1];
+
+def advances =
+    if sourceDataAvailable then rawAdvances
+    else if carryLastValidReading then lastValidAdvances
+    else Double.NaN;
+
+def declines =
+    if sourceDataAvailable then rawDeclines
+    else if carryLastValidReading then lastValidDeclines
+    else Double.NaN;
+
+def issueCount = advances + declines;
+def dailyBreadth =
+    if issueCount != 0
+    then 100 * (advances - declines) / issueCount
+    else Double.NaN;
+
+def fiveDayBreadth =
+    if sourceDataAvailable then Average(dailyBreadth, fiveDayLength)
+    else Average(dailyBreadth[1], fiveDayLength);
+def newWeek = GetWeek() != GetWeek()[1];
+
+rec weeklyBreadthTotal =
+    if BarNumber() == 1 then
+        if sourceDataAvailable then dailyBreadth else 0
+    else if sourceDataAvailable and newWeek then
+        dailyBreadth
+    else if sourceDataAvailable then
+        weeklyBreadthTotal[1] + dailyBreadth
+    else
+        weeklyBreadthTotal[1];
+
+rec weeklySessionCount =
+    if BarNumber() == 1 then
+        if sourceDataAvailable then 1 else 0
+    else if sourceDataAvailable and newWeek then
+        1
+    else if sourceDataAvailable then
+        weeklySessionCount[1] + 1
+    else
+        weeklySessionCount[1];
+
+def currentWeekBreadth =
+    if weeklySessionCount > 0
+    then weeklyBreadthTotal / weeklySessionCount
+    else Double.NaN;
+def dataAvailable = !IsNaN(dailyBreadth);
+
+plot Daily =
+    if isDailyChart and showDailyBreadth
+    then dailyBreadth
+    else Double.NaN;
+Daily.SetPaintingStrategy(PaintingStrategy.HISTOGRAM);
+Daily.SetLineWeight(3);
+Daily.AssignValueColor(
+    if dailyBreadth >= broadParticipationLevel then Color.GREEN
+    else if dailyBreadth <= -broadParticipationLevel then Color.RED
+    else if dailyBreadth >= 0 then Color.DARK_GREEN
+    else Color.DARK_RED
+);
+
+plot FiveDayAverage =
+    if isDailyChart and showFiveDayAverage
+    then fiveDayBreadth
+    else Double.NaN;
+FiveDayAverage.SetDefaultColor(Color.YELLOW);
+FiveDayAverage.SetLineWeight(2);
+
+plot CurrentWeekAverage =
+    if isDailyChart and showCurrentWeekAverage
+    then currentWeekBreadth
+    else Double.NaN;
+CurrentWeekAverage.SetDefaultColor(Color.CYAN);
+CurrentWeekAverage.SetLineWeight(2);
+
+plot ZeroLine = if isDailyChart then 0 else Double.NaN;
+ZeroLine.SetDefaultColor(Color.GRAY);
+ZeroLine.SetStyle(Curve.LONG_DASH);
+
+plot BroadPositive =
+    if isDailyChart then broadParticipationLevel else Double.NaN;
+BroadPositive.SetDefaultColor(Color.DARK_GREEN);
+BroadPositive.SetStyle(Curve.SHORT_DASH);
+
+plot BroadNegative =
+    if isDailyChart then -broadParticipationLevel else Double.NaN;
+BroadNegative.SetDefaultColor(Color.DARK_RED);
+BroadNegative.SetStyle(Curve.SHORT_DASH);
+
+AddLabel(
+    !isDailyChart,
+    "DAILY CHART REQUIRED",
+    Color.RED
+);
+
+AddLabel(
+    isDailyChart and !dataAvailable,
+    "BREADTH DATA UNAVAILABLE",
+    Color.GRAY
+);
+
+AddLabel(
+    isDailyChart and dataAvailable and !sourceDataAvailable,
+    "USING LAST BREADTH CLOSE",
+    Color.YELLOW
+);
+
+AddLabel(
+    isDailyChart and dataAvailable,
+    "DAILY " + Round(dailyBreadth, 1) + "%",
+    if dailyBreadth >= broadParticipationLevel then Color.GREEN
+    else if dailyBreadth <= -broadParticipationLevel then Color.RED
+    else Color.GRAY
+);
+
+AddLabel(
+    isDailyChart and dataAvailable,
+    fiveDayLength + "D AVG " + Round(fiveDayBreadth, 1) + "%",
+    if fiveDayBreadth > 0 then Color.GREEN
+    else if fiveDayBreadth < 0 then Color.RED
+    else Color.GRAY
+);
+
+AddLabel(
+    isDailyChart and dataAvailable,
+    "WEEK AVG " + Round(currentWeekBreadth, 1) + "%",
+    if currentWeekBreadth > 0 then Color.GREEN
+    else if currentWeekBreadth < 0 then Color.RED
+    else Color.GRAY
+);

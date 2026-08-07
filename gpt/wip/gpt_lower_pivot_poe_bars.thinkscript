@@ -1,0 +1,239 @@
+# Lower Pivot POE Bars
+# Highlights possible long points of entry near a rolling lower extreme.
+#
+# Setup bubbles:
+#   COMP = compressed spread on a volume spike
+#   NS   = no-supply bar (narrow down bar on the lowest volume)
+#   ND   = no-demand bar (narrow up bar on the lowest volume)
+#   EXH  = possible selling-exhaustion bar
+#   EOM  = bullish ease-of-movement confirmation after a setup
+#
+# Signals are descriptive, not orders. By default, the current forming bar is
+# ignored so a bubble is not shown until the bar has closed.
+
+declare upper;
+
+input pivotLookback = 20;
+input proximityATR = 0.35;
+input legComparisonBars = 3;
+
+input atrLength = 14;
+input spreadAverageLength = 20;
+input volumeAverageLength = 20;
+
+input compressedSpreadFactor = 0.65;
+input narrowSpreadFactor = 0.80;
+input wideSpreadFactor = 1.50;
+input volumeSpikeFactor = 1.50;
+input exhaustionVolumeFactor = 1.80;
+input exhaustionClosePercent = 0.50;
+
+input lowVolumeLookback = 3;
+input showNoDemand = yes;
+
+input eomConfirmationBars = 3;
+input eomSpreadFactor = 1.10;
+input eomBodyPercent = 0.50;
+input eomClosePercent = 0.70;
+input eomMaxVolumeFactor = 1.50;
+
+input useTrendOrRangeFilter = yes;
+input trendAverageLength = 50;
+input adxLength = 14;
+input maximumRangeADX = 25.0;
+
+input onlyClosedBars = yes;
+input showBubbles = yes;
+input showArrows = yes;
+input showLowerExtreme = no;
+input enableAlerts = no;
+
+DefineGlobalColor("Compressed", CreateColor(0, 190, 255));
+DefineGlobalColor("NoSupply", CreateColor(70, 220, 120));
+DefineGlobalColor("NoDemand", CreateColor(190, 120, 255));
+DefineGlobalColor("Exhaustion", CreateColor(255, 170, 0));
+DefineGlobalColor("EOM", CreateColor(0, 230, 170));
+DefineGlobalColor("Extreme", CreateColor(120, 120, 120));
+
+def barRange = high - low;
+def trueRange = TrueRange(high, close, low);
+def atr = Average(trueRange, atrLength);
+def averageSpread = Average(barRange, spreadAverageLength);
+def averageVolume = Average(volume, volumeAverageLength);
+def hasVolume = !IsNaN(volume) and volume > 0 and averageVolume > 0;
+
+def priorLowerExtreme = Lowest(low[1], pivotLookback);
+def nearLowerExtreme =
+    !IsNaN(priorLowerExtreme) and
+    low <= priorLowerExtreme + proximityATR * atr;
+
+# Requiring a lower low than several bars ago keeps isolated quiet bars in the
+# middle of a range from being treated as lower-pivot tests.
+def counterLegDown =
+    low < low[legComparisonBars] or
+    close < close[legComparisonBars];
+
+# A rising longer average represents an uptrend. Low ADX admits trading ranges.
+def trendAverage = Average(close, trendAverageLength);
+def uptrendContext = trendAverage >= trendAverage[1];
+def rangeContext = ADX(adxLength) <= maximumRangeADX;
+def contextOK =
+    !useTrendOrRangeFilter or
+    uptrendContext or
+    rangeContext;
+
+def closedBarOK = !onlyClosedBars or !IsNaN(close[-1]);
+def setupLocationOK =
+    closedBarOK and
+    nearLowerExtreme and
+    counterLegDown and
+    contextOK;
+
+def compressedVolumeSpike =
+    setupLocationOK and
+    hasVolume and
+    barRange <= compressedSpreadFactor * averageSpread and
+    volume >= volumeSpikeFactor * averageVolume;
+
+def lowestRecentVolume =
+    hasVolume and
+    volume < Lowest(volume[1], lowVolumeLookback);
+def narrowSpread = barRange <= narrowSpreadFactor * averageSpread;
+def downBar = close < close[1];
+def upBar = close > close[1];
+
+def noSupply =
+    setupLocationOK and
+    lowestRecentVolume and
+    narrowSpread and
+    downBar;
+
+def noDemand =
+    setupLocationOK and
+    showNoDemand and
+    lowestRecentVolume and
+    narrowSpread and
+    upBar;
+
+def closePosition =
+    if barRange > 0
+    then (close - low) / barRange
+    else 0.5;
+
+def sellingExhaustion =
+    setupLocationOK and
+    hasVolume and
+    low <= priorLowerExtreme and
+    barRange >= wideSpreadFactor * averageSpread and
+    volume >= exhaustionVolumeFactor * averageVolume and
+    closePosition >= exhaustionClosePercent;
+
+def anySetup =
+    compressedVolumeSpike or
+    noSupply or
+    noDemand or
+    sellingExhaustion;
+
+# Confirmation is deliberately required to occur after, rather than on, a
+# setup bar. A wide bullish body closing near its high represents price moving
+# upward readily without another climactic-volume event.
+def recentSetup =
+    Highest(if anySetup[1] then 1 else 0, eomConfirmationBars) > 0;
+def bodyPercent =
+    if barRange > 0
+    then AbsValue(close - open) / barRange
+    else 0;
+
+def bullishEOM =
+    closedBarOK and
+    recentSetup and
+    close > open and
+    close > close[1] and
+    barRange >= eomSpreadFactor * averageSpread and
+    bodyPercent >= eomBodyPercent and
+    closePosition >= eomClosePercent and
+    (!hasVolume or volume <= eomMaxVolumeFactor * averageVolume);
+
+AddChartBubble(
+    showBubbles and compressedVolumeSpike,
+    low,
+    "COMP",
+    GlobalColor("Compressed"),
+    no
+);
+
+AddChartBubble(
+    showBubbles and noSupply,
+    low,
+    "NS",
+    GlobalColor("NoSupply"),
+    no
+);
+
+AddChartBubble(
+    showBubbles and noDemand,
+    low,
+    "ND",
+    GlobalColor("NoDemand"),
+    no
+);
+
+AddChartBubble(
+    showBubbles and sellingExhaustion,
+    low,
+    "EXH",
+    GlobalColor("Exhaustion"),
+    no
+);
+
+AddChartBubble(
+    showBubbles and bullishEOM,
+    low,
+    "EOM",
+    GlobalColor("EOM"),
+    no
+);
+
+plot POEArrow =
+    if showArrows and anySetup
+    then low - 0.15 * atr
+    else Double.NaN;
+POEArrow.SetPaintingStrategy(PaintingStrategy.ARROW_UP);
+POEArrow.SetLineWeight(2);
+POEArrow.AssignValueColor(
+    if sellingExhaustion then GlobalColor("Exhaustion")
+    else if compressedVolumeSpike then GlobalColor("Compressed")
+    else if noSupply then GlobalColor("NoSupply")
+    else GlobalColor("NoDemand")
+);
+
+plot EOMArrow =
+    if showArrows and bullishEOM
+    then low - 0.15 * atr
+    else Double.NaN;
+EOMArrow.SetPaintingStrategy(PaintingStrategy.ARROW_UP);
+EOMArrow.SetDefaultColor(GlobalColor("EOM"));
+EOMArrow.SetLineWeight(3);
+
+plot LowerExtreme =
+    if showLowerExtreme
+    then priorLowerExtreme
+    else Double.NaN;
+LowerExtreme.SetDefaultColor(GlobalColor("Extreme"));
+LowerExtreme.SetStyle(Curve.SHORT_DASH);
+LowerExtreme.HideBubble();
+LowerExtreme.HideTitle();
+
+Alert(
+    enableAlerts and anySetup,
+    "Lower-pivot POE candidate",
+    Alert.BAR,
+    Sound.Ding
+);
+
+Alert(
+    enableAlerts and bullishEOM,
+    "Bullish EOM after lower-pivot setup",
+    Alert.BAR,
+    Sound.Ring
+);

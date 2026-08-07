@@ -1,0 +1,400 @@
+# Swing-Pivot Volatility Contraction Pattern (VCP)
+#
+# Uses confirmed swing highs and lows to identify a sequence of progressively
+# smaller pullbacks with higher lows. A setup becomes ready when the final
+# contraction also shows price/volume volatility dry-up. A breakout is marked
+# when price closes through the stored swing-high pivot.
+#
+# Signal calculations are causal: a swing is not accepted until pivotRightBars
+# bars have closed to its right. Optional swing dots are drawn on the original
+# pivot bar for readability, so those dots appear only after confirmation.
+#
+# This is a mechanical approximation of a discretionary chart pattern. It is
+# intended as a study/alert, not an order-entry strategy.
+
+declare upper;
+
+input pivotLeftBars = 5;
+input pivotRightBars = 3;
+input minimumContractions = 2;
+input maximumBaseBars = 80;
+input minimumContractionDepthPercent = 3.0;
+input maximumContractionDepthPercent = 35.0;
+input maximumFinalDepthPercent = 15.0;
+input contractionRatioLimit = 0.85;
+input requireHigherLows = yes;
+
+input useVolumeDryUp = yes;
+input dryUpVolumeLength = 5;
+input baselineVolumeLength = 50;
+input maximumDryUpVolumeRatio = 0.75;
+
+input useATRContraction = yes;
+input shortATRLength = 5;
+input longATRLength = 20;
+input maximumATRRatio = 0.80;
+
+input useTrendContext = yes;
+input trendFastLength = 50;
+input trendSlowLength = 200;
+
+input requireBreakoutVolume = yes;
+input breakoutVolumeLength = 50;
+input breakoutVolumeFactor = 1.40;
+input onlyClosedBars = yes;
+
+input showSwingPivots = yes;
+input showContractionBubbles = yes;
+input showPivotLine = yes;
+input showFailureLine = yes;
+input showSetupCloud = no;
+input showLabels = yes;
+input enableAlerts = no;
+
+DefineGlobalColor("SwingHigh", CreateColor(255, 190, 70));
+DefineGlobalColor("SwingLow", CreateColor(80, 200, 255));
+DefineGlobalColor("Setup", CreateColor(255, 205, 0));
+DefineGlobalColor("Ready", CreateColor(0, 210, 170));
+DefineGlobalColor("Breakout", CreateColor(0, 230, 90));
+DefineGlobalColor("Failure", CreateColor(230, 80, 80));
+
+def bn = BarNumber();
+def pivotWindow = pivotLeftBars + pivotRightBars + 1;
+def closedBarOK = !onlyClosedBars or !IsNaN(close[-1]);
+
+# These confirmation events occur pivotRightBars after the actual swing bar.
+def confirmedPivotHigh =
+    !IsNaN(high[pivotRightBars]) and
+    high[pivotRightBars] == Highest(high, pivotWindow);
+def confirmedPivotLow =
+    !IsNaN(low[pivotRightBars]) and
+    low[pivotRightBars] == Lowest(low, pivotWindow);
+
+def pivotHighPrice = if confirmedPivotHigh then high[pivotRightBars] else Double.NaN;
+def pivotLowPrice = if confirmedPivotLow then low[pivotRightBars] else Double.NaN;
+def pivotHighBar = bn - pivotRightBars;
+def pivotLowBar = bn - pivotRightBars;
+
+rec lastSwingHigh =
+    if bn == 1 then Double.NaN
+    else if confirmedPivotHigh then pivotHighPrice
+    else lastSwingHigh[1];
+rec lastSwingHighBar =
+    if bn == 1 then 0
+    else if confirmedPivotHigh then pivotHighBar
+    else lastSwingHighBar[1];
+
+# Give each confirmed high an ID. A high may seed only one contraction low;
+# this avoids counting neighboring low pivots as separate contractions.
+rec swingHighSerial =
+    if bn == 1 then 0
+    else if confirmedPivotHigh then swingHighSerial[1] + 1
+    else swingHighSerial[1];
+rec lastPairedHighSerial =
+    if bn == 1 then 0
+    else if confirmedPivotLow and
+            swingHighSerial[1] > lastPairedHighSerial[1] and
+            lastSwingHighBar[1] < pivotLowBar and
+            lastSwingHigh[1] > pivotLowPrice
+    then swingHighSerial[1]
+    else lastPairedHighSerial[1];
+
+def newHighLowPair =
+    confirmedPivotLow and
+    swingHighSerial[1] > lastPairedHighSerial[1] and
+    lastSwingHighBar[1] < pivotLowBar and
+    lastSwingHigh[1] > pivotLowPrice;
+
+def contractionDepth =
+    if newHighLowPair
+    then 100 * (lastSwingHigh[1] - pivotLowPrice) / lastSwingHigh[1]
+    else Double.NaN;
+
+def depthInRange =
+    contractionDepth >= minimumContractionDepthPercent and
+    contractionDepth <= maximumContractionDepthPercent;
+def qualifyingContraction = newHighLowPair and depthInRange;
+
+rec priorContractionDepth =
+    if bn == 1 then Double.NaN
+    else if qualifyingContraction then contractionDepth
+    else priorContractionDepth[1];
+rec priorContractionLow =
+    if bn == 1 then Double.NaN
+    else if qualifyingContraction then pivotLowPrice
+    else priorContractionLow[1];
+
+rec contractionStartBar =
+    if bn == 1 then 0
+    else if qualifyingContraction then
+        if contractionStartBar[1] > 0 and
+           pivotLowBar - contractionStartBar[1] <= maximumBaseBars and
+           !IsNaN(priorContractionDepth[1]) and
+           contractionDepth <= priorContractionDepth[1] * contractionRatioLimit and
+           (!requireHigherLows or
+            (!IsNaN(priorContractionLow[1]) and
+             pivotLowPrice > priorContractionLow[1]))
+        then contractionStartBar[1]
+        else pivotLowBar
+    else contractionStartBar[1];
+
+def sequenceIsFresh =
+    contractionStartBar[1] > 0 and
+    pivotLowBar - contractionStartBar[1] <= maximumBaseBars;
+def depthIsContracting =
+    !IsNaN(priorContractionDepth[1]) and
+    contractionDepth <= priorContractionDepth[1] * contractionRatioLimit;
+def lowIsHigher =
+    !requireHigherLows or
+    (!IsNaN(priorContractionLow[1]) and pivotLowPrice > priorContractionLow[1]);
+def continuesSequence =
+    qualifyingContraction and
+    sequenceIsFresh and
+    depthIsContracting and
+    lowIsHigher;
+
+rec contractionCount =
+    if bn == 1 then 0
+    else if qualifyingContraction then
+        if continuesSequence then Min(10, contractionCount[1] + 1) else 1
+    else contractionCount[1];
+
+# The breakout pivot is the swing high immediately preceding the latest
+# qualifying contraction. The failure level is that contraction's swing low.
+rec activePivot =
+    if bn == 1 then Double.NaN
+    else if qualifyingContraction then lastSwingHigh[1]
+    else activePivot[1];
+rec activeLow =
+    if bn == 1 then Double.NaN
+    else if qualifyingContraction then pivotLowPrice
+    else activeLow[1];
+rec finalContractionDepth =
+    if bn == 1 then Double.NaN
+    else if qualifyingContraction then contractionDepth
+    else finalContractionDepth[1];
+
+def baseAge = bn - contractionStartBar;
+def activeCandidate = contractionCount > 0 and baseAge <= maximumBaseBars;
+def structuralSetup =
+    contractionCount >= minimumContractions and
+    baseAge <= maximumBaseBars and
+    finalContractionDepth <= maximumFinalDepthPercent;
+
+def shortAverageVolume = Average(volume, dryUpVolumeLength);
+def baselineAverageVolume = Average(volume, baselineVolumeLength);
+def volumeDryUpRatio =
+    if baselineAverageVolume > 0
+    then shortAverageVolume / baselineAverageVolume
+    else Double.NaN;
+def volumeDryUpOK =
+    !useVolumeDryUp or
+    volumeDryUpRatio <= maximumDryUpVolumeRatio;
+
+def trueRange = TrueRange(high, close, low);
+def shortATR = Average(trueRange, shortATRLength);
+def longATR = Average(trueRange, longATRLength);
+def atrRatio = if longATR > 0 then shortATR / longATR else Double.NaN;
+def atrContractionOK =
+    !useATRContraction or
+    atrRatio <= maximumATRRatio;
+
+def fastTrendAverage = Average(close, trendFastLength);
+def slowTrendAverage = Average(close, trendSlowLength);
+def trendContextOK =
+    !useTrendContext or
+    (close > fastTrendAverage and
+     close > slowTrendAverage and
+     fastTrendAverage > slowTrendAverage);
+
+def setupConditions =
+    structuralSetup and
+    volumeDryUpOK and
+    atrContractionOK and
+    trendContextOK;
+
+def priorBreakoutAverageVolume = Average(volume[1], breakoutVolumeLength);
+def breakoutVolumeOK =
+    !requireBreakoutVolume or
+    volume >= breakoutVolumeFactor * priorBreakoutAverageVolume;
+
+rec setupFinished =
+    if bn == 1 then 0
+    else if qualifyingContraction then 0
+    else if closedBarOK and
+            setupFinished[1] == 0 and
+            setupConditions and
+            Crosses(close, activePivot, CrossingDirection.ABOVE) and
+            breakoutVolumeOK
+    then 1
+    else if closedBarOK and
+            setupFinished[1] == 0 and
+            structuralSetup and
+            (close < activeLow or
+             (confirmedPivotLow and pivotLowPrice < activeLow))
+    then 1
+    else setupFinished[1];
+
+def setupReady = setupConditions and setupFinished[1] == 0;
+def breakoutSignal =
+    closedBarOK and
+    setupReady and
+    Crosses(close, activePivot, CrossingDirection.ABOVE) and
+    breakoutVolumeOK;
+def failureSignal =
+    closedBarOK and
+    setupFinished[1] == 0 and
+    structuralSetup and
+    (close < activeLow or
+     (confirmedPivotLow and pivotLowPrice < activeLow));
+
+# Back-plotted visual swing markers. Their placement uses right-side bars, but
+# all pattern state and signals above use only confirmed events.
+def visualPivotHigh =
+    !IsNaN(high[-pivotRightBars]) and
+    high == Highest(high[-pivotRightBars], pivotWindow);
+def visualPivotLow =
+    !IsNaN(low[-pivotRightBars]) and
+    low == Lowest(low[-pivotRightBars], pivotWindow);
+
+plot SwingHigh = if showSwingPivots and visualPivotHigh then high else Double.NaN;
+SwingHigh.SetPaintingStrategy(PaintingStrategy.POINTS);
+SwingHigh.SetLineWeight(3);
+SwingHigh.SetDefaultColor(GlobalColor("SwingHigh"));
+SwingHigh.HideBubble();
+SwingHigh.HideTitle();
+
+plot SwingLow = if showSwingPivots and visualPivotLow then low else Double.NaN;
+SwingLow.SetPaintingStrategy(PaintingStrategy.POINTS);
+SwingLow.SetLineWeight(3);
+SwingLow.SetDefaultColor(GlobalColor("SwingLow"));
+SwingLow.HideBubble();
+SwingLow.HideTitle();
+
+plot VCPPivot =
+    if showPivotLine and activeCandidate and setupFinished[1] == 0
+    then activePivot
+    else Double.NaN;
+VCPPivot.SetStyle(Curve.SHORT_DASH);
+VCPPivot.SetLineWeight(2);
+VCPPivot.AssignValueColor(
+    if setupReady then GlobalColor("Ready")
+    else if structuralSetup then GlobalColor("Setup")
+    else GlobalColor("SwingHigh")
+);
+VCPPivot.HideBubble();
+VCPPivot.HideTitle();
+
+plot VCPFailureLevel =
+    if (showFailureLine or showSetupCloud) and
+       activeCandidate and
+       setupFinished[1] == 0
+    then activeLow
+    else Double.NaN;
+VCPFailureLevel.SetDefaultColor(GlobalColor("Failure"));
+VCPFailureLevel.SetStyle(Curve.SHORT_DASH);
+VCPFailureLevel.HideBubble();
+VCPFailureLevel.HideTitle();
+
+AddCloud(
+    if showSetupCloud then VCPPivot else Double.NaN,
+    if showSetupCloud then VCPFailureLevel else Double.NaN,
+    Color.DARK_GREEN,
+    Color.DARK_GREEN
+);
+
+plot BreakoutArrow =
+    if breakoutSignal then low - 0.25 * longATR else Double.NaN;
+BreakoutArrow.SetPaintingStrategy(PaintingStrategy.ARROW_UP);
+BreakoutArrow.SetLineWeight(4);
+BreakoutArrow.SetDefaultColor(GlobalColor("Breakout"));
+BreakoutArrow.HideBubble();
+BreakoutArrow.HideTitle();
+
+AddChartBubble(
+    showContractionBubbles and qualifyingContraction,
+    low,
+    "C" + contractionCount + " " + AsText(Round(contractionDepth, 1)) + "%",
+    if setupConditions then GlobalColor("Ready")
+    else if continuesSequence then GlobalColor("Setup")
+    else GlobalColor("SwingLow"),
+    no
+);
+
+AddChartBubble(
+    breakoutSignal,
+    low,
+    "VCP BO",
+    GlobalColor("Breakout"),
+    no
+);
+
+AddChartBubble(
+    showContractionBubbles and setupReady and !setupReady[1],
+    low,
+    "VCP READY > " + AsText(Round(activePivot, 2)),
+    GlobalColor("Ready"),
+    no
+);
+
+AddChartBubble(
+    showContractionBubbles and failureSignal,
+    high,
+    "VCP FAIL",
+    GlobalColor("Failure"),
+    yes
+);
+
+AddLabel(
+    showLabels,
+    if !activeCandidate then
+        "VCP SCANNING | waiting for first valid contraction"
+    else if setupFinished then
+        "VCP INACTIVE | prior setup broke out or failed"
+    else if contractionCount < minimumContractions then
+        "VCP BUILDING | " + contractionCount + " of " +
+            minimumContractions + " contractions"
+    else if finalContractionDepth > maximumFinalDepthPercent then
+        "VCP WAIT | final contraction is too wide"
+    else if !volumeDryUpOK then
+        "VCP WAIT | volume has not dried up"
+    else if !atrContractionOK then
+        "VCP WAIT | price volatility has not contracted"
+    else if !trendContextOK then
+        "VCP WAIT | trend context is not bullish"
+    else
+        "VCP READY | breakout pivot " + AsText(Round(activePivot, 2)),
+    if setupReady then GlobalColor("Ready")
+    else if setupFinished then Color.DARK_GRAY
+    else if activeCandidate then GlobalColor("Setup")
+    else Color.GRAY
+);
+
+AddLabel(
+    showLabels and activeCandidate,
+    "C" + contractionCount + " depth " +
+        AsText(Round(finalContractionDepth, 1)) + "% | volume " +
+        AsText(Round(volumeDryUpRatio, 2)) + "x | ATR " +
+        AsText(Round(atrRatio, 2)) + "x",
+    Color.LIGHT_GRAY
+);
+
+AddLabel(
+    showLabels and showSwingPivots,
+    "orange dot = confirmed high | cyan dot = confirmed low",
+    Color.GRAY
+);
+
+Alert(
+    enableAlerts and setupReady and !setupReady[1],
+    "Swing VCP setup ready",
+    Alert.BAR,
+    Sound.Ding
+);
+
+Alert(
+    enableAlerts and breakoutSignal,
+    "Swing VCP breakout",
+    Alert.BAR,
+    Sound.Ring
+);

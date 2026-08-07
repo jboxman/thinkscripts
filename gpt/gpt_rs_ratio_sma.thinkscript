@@ -1,0 +1,30 @@
+# Relative Strength Ratio with Adaptive SMA
+# Plots the symbol's price relative to a comparison symbol and overlays a
+# simple moving average of that ratio using an approximately six-month
+# lookback: 126 periods daily, 26 periods weekly, and 6 periods monthly.
+
+declare lower;
+
+input comparisonSymbol = "SPX";
+
+# Determine the appropriate six-month MA length for the chart aggregation
+def agg = GetAggregationPeriod();
+def maLength = if agg >= AggregationPeriod.MONTH then 6
+               else if agg >= AggregationPeriod.WEEK then 26
+               else 126;
+
+# Compute RS Ratio
+def RS = close / close(comparisonSymbol);
+
+# Compute SMA of RS
+def RS_SMA = Average(RS, maLength);
+
+# Plot RS Ratio
+plot RS_Ratio = RS;
+RS_Ratio.SetDefaultColor(Color.CYAN);
+RS_Ratio.SetLineWeight(1);
+
+# Plot RS SMA
+plot RS_MA = RS_SMA;
+RS_MA.SetDefaultColor(Color.BLUE);
+RS_MA.SetLineWeight(2);

@@ -1,0 +1,192 @@
+# McClellan Timing + Confirmation
+# Full chart legend and interpretation:
+# docs/gpt_McClellanNormalized.md
+#
+# MCO  = timing: short-term breadth stretch in sigma units.
+# MCSI = confirmation: distance from its 10-day moving average in sigma units.
+#
+# Designed for the workflow:
+#   MCO <= -1 sigma       timing alert
+#   MCO <= -2 sigma       deeper washout
+#   MCSI curl up          early breadth repair
+#   MCSI crosses above 0  raw MCSI reclaimed its moving average
+#   MCSI curl down        participation is fading
+#
+# Use on a daily chart. Load at least 2x mcsiSigmaLength bars because the
+# cumulative Summation Index and its residual scale need adequate warm-up.
+
+declare lower;
+
+input exchange = {NYSE, NASDAQ, AMEX, default NASDAQ_100, SP_500, RUSSELL_2000, ALL_US};
+input fastLength = 19;
+input slowLength = 39;
+input ratioAdjusted = no;
+input isCumulative = yes;
+
+# ZERO_CENTERED_SIGMA preserves MCO's natural zero as neutral and measures
+# stretch from zero. Z_SCORE measures surprise relative to MCO's rolling mean.
+input mcoNormalization = {default ZERO_CENTERED_SIGMA, Z_SCORE};
+input mcoSigmaLength = 63;
+
+# The MCSI score is always its distance from this moving average. A zero-cross
+# therefore has a direct structural meaning: MCSI reclaimed/lost its own MA.
+input mcsiAverageLength = 10;
+input mcsiAverageType = AverageType.SIMPLE;
+input mcsiSigmaLength = 63;
+
+input alertLevel = 1.0;
+input washoutLevel = 2.0;
+input showMCO = yes;
+input showMCSI = yes;
+input showTurnMarkers = yes;
+input showReclaimMarkers = yes;
+input showLabels = yes;
+input extendReferenceLinesIntoExpansion = no;
+
+Assert(fastLength > 0, "fastLength must be greater than zero");
+Assert(slowLength > fastLength, "slowLength must be greater than fastLength");
+Assert(mcoSigmaLength > 1, "mcoSigmaLength must be greater than one");
+Assert(mcsiAverageLength > 1, "mcsiAverageLength must be greater than one");
+Assert(mcsiSigmaLength > 1, "mcsiSigmaLength must be greater than one");
+Assert(alertLevel > 0, "alertLevel must be greater than zero");
+Assert(washoutLevel > alertLevel, "washoutLevel must exceed alertLevel");
+
+def advances;
+def declines;
+switch (exchange) {
+case NYSE:
+    advances = close("$ADVN");
+    declines = close("$DECN");
+case NASDAQ:
+    advances = close("$ADVN/Q");
+    declines = close("$DECN/Q");
+case AMEX:
+    advances = close("$ADVA");
+    declines = close("$DECA");
+case NASDAQ_100:
+    advances = close("$ADVND");
+    declines = close("$DECLND");
+case SP_500:
+    advances = close("$ADVSP");
+    declines = close("$DECLSP");
+case RUSSELL_2000:
+    advances = close("$ADVRL");
+    declines = close("$DECLRL");
+case ALL_US:
+    advances = close("$ADVUS");
+    declines = close("$DECLUS");
+}
+
+def totalIssues = advances + declines;
+def rawBreadth = if ratioAdjusted
+    then if totalIssues != 0
+         then 1000 * (advances - declines) / totalIssues
+         else Double.NaN
+    else advances - declines;
+
+# Carry the most recent breadth reading across an occasional missing internal
+# data bar, matching the native McClellan study's corrected EMA behavior.
+def breadth = CompoundValue(1,
+    if !IsNaN(rawBreadth) then rawBreadth else breadth[1],
+    0);
+def fastEMA = ExpAverage(breadth, fastLength);
+def slowEMA = ExpAverage(breadth, slowLength);
+def mcoRaw = fastEMA - slowEMA;
+
+def cumulativeMCO = CompoundValue(1,
+    cumulativeMCO[1] + (if !IsNaN(rawBreadth) then mcoRaw else 0),
+    0);
+def neutralLevel = if ratioAdjusted then 0 else 1000;
+def mcsiRaw = if isCumulative
+    then neutralLevel + cumulativeMCO
+    else neutralLevel + mcoRaw - (10 * fastEMA + 20 * slowEMA);
+
+# MCO timing score.
+def mcoMean = Average(mcoRaw, mcoSigmaLength);
+def mcoSD = StDev(mcoRaw, mcoSigmaLength);
+def mcoZeroCentered = if mcoSD != 0 then mcoRaw / mcoSD else 0;
+def mcoZScore = if mcoSD != 0 then (mcoRaw - mcoMean) / mcoSD else 0;
+def mcoScore = if mcoNormalization == mcoNormalization.ZERO_CENTERED_SIGMA
+    then mcoZeroCentered
+    else mcoZScore;
+
+# MCSI confirmation score. The denominator is calculated from historical
+# 10-day-MA residuals, not from the cumulative MCSI level itself. This keeps
+# zero tied to the MA reclaim and asks whether today's deviation is unusual.
+def mcsiMA = MovingAverage(mcsiAverageType, mcsiRaw, mcsiAverageLength);
+def mcsiResidual = mcsiRaw - mcsiMA;
+def mcsiResidualSD = StDev(mcsiResidual, mcsiSigmaLength);
+def mcsiScore = if mcsiResidualSD != 0
+    then mcsiResidual / mcsiResidualSD
+    else 0;
+
+# A curl is the first raw MCSI slope reversal. It is deliberately separate
+# from the stronger moving-average reclaim/loss confirmation.
+def mcsiCurlUp = mcsiRaw > mcsiRaw[1] and mcsiRaw[1] <= mcsiRaw[2];
+def mcsiCurlDown = mcsiRaw < mcsiRaw[1] and mcsiRaw[1] >= mcsiRaw[2];
+def mcsiReclaim = Crosses(mcsiRaw, mcsiMA, CrossingDirection.ABOVE);
+def mcsiLoss = Crosses(mcsiRaw, mcsiMA, CrossingDirection.BELOW);
+def isDailyChart = GetAggregationPeriod() == AggregationPeriod.DAY;
+def hasChartBar = !IsNaN(close);
+def showReferenceBar = hasChartBar or extendReferenceLinesIntoExpansion;
+
+plot MCSI = if showMCSI and hasChartBar then mcsiScore else Double.NaN;
+plot MCO = if showMCO and hasChartBar then mcoScore else Double.NaN;
+plot PlusTwo = if showReferenceBar then washoutLevel else Double.NaN;
+plot PlusOne = if showReferenceBar then alertLevel else Double.NaN;
+plot ZeroLine = if showReferenceBar then 0 else Double.NaN;
+plot MinusOne = if showReferenceBar then -alertLevel else Double.NaN;
+plot MinusTwo = if showReferenceBar then -washoutLevel else Double.NaN;
+
+plot CurlUp = if showTurnMarkers and hasChartBar and mcsiCurlUp then mcsiScore else Double.NaN;
+plot CurlDown = if showTurnMarkers and hasChartBar and mcsiCurlDown then mcsiScore else Double.NaN;
+plot MAReclaim = if showReclaimMarkers and hasChartBar and mcsiReclaim then 0 else Double.NaN;
+plot MALoss = if showReclaimMarkers and hasChartBar and mcsiLoss then 0 else Double.NaN;
+
+MCSI.SetDefaultColor(Color.CYAN);
+MCSI.SetLineWeight(2);
+
+MCO.SetPaintingStrategy(PaintingStrategy.HISTOGRAM);
+MCO.SetLineWeight(3);
+MCO.AssignValueColor(if mcoScore >= 0 then Color.GREEN else Color.RED);
+
+PlusTwo.SetDefaultColor(Color.GRAY);
+PlusTwo.SetStyle(Curve.SHORT_DASH);
+PlusOne.SetDefaultColor(Color.DARK_GRAY);
+PlusOne.SetStyle(Curve.SHORT_DASH);
+ZeroLine.SetDefaultColor(Color.WHITE);
+MinusOne.SetDefaultColor(Color.DARK_GRAY);
+MinusOne.SetStyle(Curve.SHORT_DASH);
+MinusTwo.SetDefaultColor(Color.GRAY);
+MinusTwo.SetStyle(Curve.SHORT_DASH);
+
+CurlUp.SetPaintingStrategy(PaintingStrategy.POINTS);
+CurlUp.SetDefaultColor(Color.GREEN);
+CurlUp.SetLineWeight(4);
+CurlDown.SetPaintingStrategy(PaintingStrategy.POINTS);
+CurlDown.SetDefaultColor(Color.YELLOW);
+CurlDown.SetLineWeight(4);
+
+MAReclaim.SetPaintingStrategy(PaintingStrategy.ARROW_UP);
+MAReclaim.SetDefaultColor(Color.GREEN);
+MAReclaim.SetLineWeight(3);
+MALoss.SetPaintingStrategy(PaintingStrategy.ARROW_DOWN);
+MALoss.SetDefaultColor(Color.RED);
+MALoss.SetLineWeight(3);
+
+AddLabel(showLabels,
+    "MCO: " + Round(mcoScore, 2) + " sigma",
+    if mcoScore <= -washoutLevel then Color.RED
+    else if mcoScore <= -alertLevel then Color.YELLOW
+    else if mcoScore > 0 then Color.GREEN
+    else Color.GRAY);
+AddLabel(showLabels,
+    "MCSI vs " + mcsiAverageLength + "dma: " + Round(mcsiScore, 2) + " sigma",
+    if mcsiScore > 0 then Color.CYAN else Color.GRAY);
+AddLabel(showLabels and mcsiCurlUp, "MCSI CURL UP", Color.GREEN);
+AddLabel(showLabels and mcsiCurlDown, "MCSI CURL DOWN", Color.YELLOW);
+AddLabel(showLabels and mcsiReclaim, "MCSI MA RECLAIM", Color.GREEN);
+AddLabel(showLabels and mcsiLoss, "MCSI MA LOSS", Color.RED);
+AddLabel(showLabels and !isDailyChart,
+    "Warning: use daily aggregation",
+    Color.YELLOW);

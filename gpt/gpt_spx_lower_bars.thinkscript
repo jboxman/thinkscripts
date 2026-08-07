@@ -1,0 +1,81 @@
+# SPX Lower Bars
+# Displays SPX OHLC bars in a lower study using the chart's current interval.
+# No volume is plotted.
+
+declare lower;
+
+input symbol = "SPX";
+input chartType = ChartType.CANDLE;
+input showSymbolLabel = yes;
+
+def symbolOpen = open(symbol);
+def symbolHigh = high(symbol);
+def symbolLow = low(symbol);
+def symbolClose = close(symbol);
+
+AddLabel(showSymbolLabel, "Symbol: " + symbol, Color.LIGHT_GRAY);
+
+# Keep the live SPX range present while its candle switches color layers.
+# Change this global color in the study settings if the chart background is not
+# black. The anchors are placed beyond the live candle and only on its bar so
+# they cannot cover historical candles or their high/low tips.
+DefineGlobalColor("Background", Color.BLACK);
+
+def isLastBar = !IsNaN(symbolClose) and IsNaN(symbolClose[-1]);
+def liveRange = symbolHigh - symbolLow;
+def anchorPadding =
+    if liveRange > 0 then liveRange * 0.10
+    else AbsValue(symbolClose) * 0.001;
+
+plot ScaleHigh =
+    if isLastBar then symbolHigh + anchorPadding else Double.NaN;
+ScaleHigh.SetDefaultColor(GlobalColor("Background"));
+ScaleHigh.SetPaintingStrategy(PaintingStrategy.POINTS);
+ScaleHigh.HideBubble();
+ScaleHigh.HideTitle();
+
+plot ScaleLow =
+    if isLastBar then symbolLow - anchorPadding else Double.NaN;
+ScaleLow.SetDefaultColor(GlobalColor("Background"));
+ScaleLow.SetPaintingStrategy(PaintingStrategy.POINTS);
+ScaleLow.HideBubble();
+ScaleLow.HideTitle();
+
+# AddChart does not reliably apply its fall color to secondary-symbol candles,
+# so draw each direction in a separate, explicitly colored layer.
+def isUp = symbolClose > symbolOpen;
+def isDown = symbolClose < symbolOpen;
+def isNeutral = symbolClose == symbolOpen;
+
+AddChart(
+    high = if isUp then symbolHigh else Double.NaN,
+    low = if isUp then symbolLow else Double.NaN,
+    open = if isUp then symbolOpen else Double.NaN,
+    close = if isUp then symbolClose else Double.NaN,
+    type = chartType,
+    growColor = CreateColor(0, 197, 49),
+    fallColor = CreateColor(0, 197, 49),
+    neutralColor = CreateColor(0, 197, 49)
+);
+
+AddChart(
+    high = if isDown then symbolHigh else Double.NaN,
+    low = if isDown then symbolLow else Double.NaN,
+    open = if isDown then symbolOpen else Double.NaN,
+    close = if isDown then symbolClose else Double.NaN,
+    type = chartType,
+    growColor = CreateColor(255, 95, 95),
+    fallColor = CreateColor(255, 95, 95),
+    neutralColor = CreateColor(255, 95, 95)
+);
+
+AddChart(
+    high = if isNeutral then symbolHigh else Double.NaN,
+    low = if isNeutral then symbolLow else Double.NaN,
+    open = if isNeutral then symbolOpen else Double.NaN,
+    close = if isNeutral then symbolClose else Double.NaN,
+    type = chartType,
+    growColor = Color.GRAY,
+    fallColor = Color.GRAY,
+    neutralColor = Color.GRAY
+);

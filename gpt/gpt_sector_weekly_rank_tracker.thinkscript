@@ -1,0 +1,302 @@
+#
+# Sector Weekly Rank Tracker
+# --------------------------
+# This lower study ranks the 11 S&P 500 sectors each week by their relative
+# performance versus a benchmark, defaulting to SPX.
+#
+# Relative performance is computed as:
+#   sector return over `relativeLookbackWeeks`
+#   minus benchmark return over the same weekly window.
+#
+# What it shows:
+# - Cross-sectional rank of each sector from 1 to 11 on each bar
+# - A label for each sector showing its current rank and weekly RS value
+# - Optional last-bar bubbles for the current top 3 ranked sectors
+#
+# Interpretation:
+# - Rank 1 is the strongest sector on the selected weekly RS basis
+# - Rising rank suggests improving sector leadership
+# - Falling rank suggests deteriorating sector leadership
+#
+# Typical use:
+# - Use it as a sector leaderboard or rotation proxy on weekly charts
+# - Increase `relativeLookbackWeeks` for slower leadership trends
+# - Decrease `relativeLookbackWeeks` for faster rotation shifts
+#
+# This is a relative-strength ranking study, not a beta, momentum, or
+# breadth study.
+
+declare lower;
+
+input benchmark = "SPX";
+input relativeLookbackWeeks = 13;
+input showLabels = yes;
+input showBubbles = yes;
+
+DefineGlobalColor("Energy", Color.RED);
+DefineGlobalColor("Materials", CreateColor(255, 140, 0));
+DefineGlobalColor("Industrials", CreateColor(255, 215, 0));
+DefineGlobalColor("ConsumerDiscretionary", CreateColor(255, 0, 255));
+DefineGlobalColor("ConsumerStaples", CreateColor(50, 205, 50));
+DefineGlobalColor("HealthCare", CreateColor(186, 85, 211));
+DefineGlobalColor("Financials", CreateColor(0, 191, 255));
+DefineGlobalColor("InformationTechnology", CreateColor(0, 120, 255));
+DefineGlobalColor("CommunicationServices", CreateColor(211, 211, 211));
+DefineGlobalColor("Utilities", Color.GREEN);
+DefineGlobalColor("RealEstate", CreateColor(255, 105, 180));
+
+script WeeklyRelPerf {
+    input symbol = "$SP500#10";
+    input benchmark = "SPX";
+    input lookbackWeeks = 13;
+    input barsAgo = 0;
+
+    def sectorClose = close(symbol = symbol, period = AggregationPeriod.WEEK);
+    def benchClose = close(symbol = benchmark, period = AggregationPeriod.WEEK);
+    def sectorBase = sectorClose[lookbackWeeks + barsAgo];
+    def benchBase = benchClose[lookbackWeeks + barsAgo];
+    def sectorReturn =
+        if IsNaN(sectorClose[barsAgo]) or IsNaN(sectorBase) or sectorBase == 0 then
+            Double.NaN
+        else
+            sectorClose[barsAgo] / sectorBase - 1;
+    def benchReturn =
+        if IsNaN(benchClose[barsAgo]) or IsNaN(benchBase) or benchBase == 0 then
+            Double.NaN
+        else
+            benchClose[barsAgo] / benchBase - 1;
+    plot value =
+        if IsNaN(sectorReturn) or IsNaN(benchReturn) then
+            Double.NaN
+        else
+            100 * (sectorReturn - benchReturn);
+}
+
+script RankFromValues {
+    input currentValue = 0.0;
+    input value1 = 0.0;
+    input value2 = 0.0;
+    input value3 = 0.0;
+    input value4 = 0.0;
+    input value5 = 0.0;
+    input value6 = 0.0;
+    input value7 = 0.0;
+    input value8 = 0.0;
+    input value9 = 0.0;
+    input value10 = 0.0;
+    input value11 = 0.0;
+
+    plot rank =
+        if IsNaN(currentValue) then
+            Double.NaN
+        else
+            1 +
+            (if value1 > currentValue then 1 else 0) +
+            (if value2 > currentValue then 1 else 0) +
+            (if value3 > currentValue then 1 else 0) +
+            (if value4 > currentValue then 1 else 0) +
+            (if value5 > currentValue then 1 else 0) +
+            (if value6 > currentValue then 1 else 0) +
+            (if value7 > currentValue then 1 else 0) +
+            (if value8 > currentValue then 1 else 0) +
+            (if value9 > currentValue then 1 else 0) +
+            (if value10 > currentValue then 1 else 0) +
+            (if value11 > currentValue then 1 else 0);
+}
+
+def energyRs = WeeklyRelPerf("$SP500#10", benchmark, relativeLookbackWeeks, 0);
+def materialsRs = WeeklyRelPerf("$SP500#15", benchmark, relativeLookbackWeeks, 0);
+def industrialsRs = WeeklyRelPerf("$SP500#20", benchmark, relativeLookbackWeeks, 0);
+def consumerDiscretionaryRs = WeeklyRelPerf("$SP500#25", benchmark, relativeLookbackWeeks, 0);
+def consumerStaplesRs = WeeklyRelPerf("$SP500#30", benchmark, relativeLookbackWeeks, 0);
+def healthCareRs = WeeklyRelPerf("$SP500#35", benchmark, relativeLookbackWeeks, 0);
+def financialsRs = WeeklyRelPerf("$SP500#40", benchmark, relativeLookbackWeeks, 0);
+def informationTechnologyRs = WeeklyRelPerf("$SP500#45", benchmark, relativeLookbackWeeks, 0);
+def communicationServicesRs = WeeklyRelPerf("$SP500#50", benchmark, relativeLookbackWeeks, 0);
+def utilitiesRs = WeeklyRelPerf("$SP500#55", benchmark, relativeLookbackWeeks, 0);
+def realEstateRs = WeeklyRelPerf("$SP500#60", benchmark, relativeLookbackWeeks, 0);
+
+def energyRsPrev = WeeklyRelPerf("$SP500#10", benchmark, relativeLookbackWeeks, 1);
+def materialsRsPrev = WeeklyRelPerf("$SP500#15", benchmark, relativeLookbackWeeks, 1);
+def industrialsRsPrev = WeeklyRelPerf("$SP500#20", benchmark, relativeLookbackWeeks, 1);
+def consumerDiscretionaryRsPrev = WeeklyRelPerf("$SP500#25", benchmark, relativeLookbackWeeks, 1);
+def consumerStaplesRsPrev = WeeklyRelPerf("$SP500#30", benchmark, relativeLookbackWeeks, 1);
+def healthCareRsPrev = WeeklyRelPerf("$SP500#35", benchmark, relativeLookbackWeeks, 1);
+def financialsRsPrev = WeeklyRelPerf("$SP500#40", benchmark, relativeLookbackWeeks, 1);
+def informationTechnologyRsPrev = WeeklyRelPerf("$SP500#45", benchmark, relativeLookbackWeeks, 1);
+def communicationServicesRsPrev = WeeklyRelPerf("$SP500#50", benchmark, relativeLookbackWeeks, 1);
+def utilitiesRsPrev = WeeklyRelPerf("$SP500#55", benchmark, relativeLookbackWeeks, 1);
+def realEstateRsPrev = WeeklyRelPerf("$SP500#60", benchmark, relativeLookbackWeeks, 1);
+
+def energyRank = RankFromValues(energyRs, energyRs, materialsRs, industrialsRs, consumerDiscretionaryRs, consumerStaplesRs, healthCareRs, financialsRs, informationTechnologyRs, communicationServicesRs, utilitiesRs, realEstateRs);
+def materialsRank = RankFromValues(materialsRs, energyRs, materialsRs, industrialsRs, consumerDiscretionaryRs, consumerStaplesRs, healthCareRs, financialsRs, informationTechnologyRs, communicationServicesRs, utilitiesRs, realEstateRs);
+def industrialsRank = RankFromValues(industrialsRs, energyRs, materialsRs, industrialsRs, consumerDiscretionaryRs, consumerStaplesRs, healthCareRs, financialsRs, informationTechnologyRs, communicationServicesRs, utilitiesRs, realEstateRs);
+def consumerDiscretionaryRank = RankFromValues(consumerDiscretionaryRs, energyRs, materialsRs, industrialsRs, consumerDiscretionaryRs, consumerStaplesRs, healthCareRs, financialsRs, informationTechnologyRs, communicationServicesRs, utilitiesRs, realEstateRs);
+def consumerStaplesRank = RankFromValues(consumerStaplesRs, energyRs, materialsRs, industrialsRs, consumerDiscretionaryRs, consumerStaplesRs, healthCareRs, financialsRs, informationTechnologyRs, communicationServicesRs, utilitiesRs, realEstateRs);
+def healthCareRank = RankFromValues(healthCareRs, energyRs, materialsRs, industrialsRs, consumerDiscretionaryRs, consumerStaplesRs, healthCareRs, financialsRs, informationTechnologyRs, communicationServicesRs, utilitiesRs, realEstateRs);
+def financialsRank = RankFromValues(financialsRs, energyRs, materialsRs, industrialsRs, consumerDiscretionaryRs, consumerStaplesRs, healthCareRs, financialsRs, informationTechnologyRs, communicationServicesRs, utilitiesRs, realEstateRs);
+def informationTechnologyRank = RankFromValues(informationTechnologyRs, energyRs, materialsRs, industrialsRs, consumerDiscretionaryRs, consumerStaplesRs, healthCareRs, financialsRs, informationTechnologyRs, communicationServicesRs, utilitiesRs, realEstateRs);
+def communicationServicesRank = RankFromValues(communicationServicesRs, energyRs, materialsRs, industrialsRs, consumerDiscretionaryRs, consumerStaplesRs, healthCareRs, financialsRs, informationTechnologyRs, communicationServicesRs, utilitiesRs, realEstateRs);
+def utilitiesRank = RankFromValues(utilitiesRs, energyRs, materialsRs, industrialsRs, consumerDiscretionaryRs, consumerStaplesRs, healthCareRs, financialsRs, informationTechnologyRs, communicationServicesRs, utilitiesRs, realEstateRs);
+def realEstateRank = RankFromValues(realEstateRs, energyRs, materialsRs, industrialsRs, consumerDiscretionaryRs, consumerStaplesRs, healthCareRs, financialsRs, informationTechnologyRs, communicationServicesRs, utilitiesRs, realEstateRs);
+
+def energyRankPrev = RankFromValues(energyRsPrev, energyRsPrev, materialsRsPrev, industrialsRsPrev, consumerDiscretionaryRsPrev, consumerStaplesRsPrev, healthCareRsPrev, financialsRsPrev, informationTechnologyRsPrev, communicationServicesRsPrev, utilitiesRsPrev, realEstateRsPrev);
+def materialsRankPrev = RankFromValues(materialsRsPrev, energyRsPrev, materialsRsPrev, industrialsRsPrev, consumerDiscretionaryRsPrev, consumerStaplesRsPrev, healthCareRsPrev, financialsRsPrev, informationTechnologyRsPrev, communicationServicesRsPrev, utilitiesRsPrev, realEstateRsPrev);
+def industrialsRankPrev = RankFromValues(industrialsRsPrev, energyRsPrev, materialsRsPrev, industrialsRsPrev, consumerDiscretionaryRsPrev, consumerStaplesRsPrev, healthCareRsPrev, financialsRsPrev, informationTechnologyRsPrev, communicationServicesRsPrev, utilitiesRsPrev, realEstateRsPrev);
+def consumerDiscretionaryRankPrev = RankFromValues(consumerDiscretionaryRsPrev, energyRsPrev, materialsRsPrev, industrialsRsPrev, consumerDiscretionaryRsPrev, consumerStaplesRsPrev, healthCareRsPrev, financialsRsPrev, informationTechnologyRsPrev, communicationServicesRsPrev, utilitiesRsPrev, realEstateRsPrev);
+def consumerStaplesRankPrev = RankFromValues(consumerStaplesRsPrev, energyRsPrev, materialsRsPrev, industrialsRsPrev, consumerDiscretionaryRsPrev, consumerStaplesRsPrev, healthCareRsPrev, financialsRsPrev, informationTechnologyRsPrev, communicationServicesRsPrev, utilitiesRsPrev, realEstateRsPrev);
+def healthCareRankPrev = RankFromValues(healthCareRsPrev, energyRsPrev, materialsRsPrev, industrialsRsPrev, consumerDiscretionaryRsPrev, consumerStaplesRsPrev, healthCareRsPrev, financialsRsPrev, informationTechnologyRsPrev, communicationServicesRsPrev, utilitiesRsPrev, realEstateRsPrev);
+def financialsRankPrev = RankFromValues(financialsRsPrev, energyRsPrev, materialsRsPrev, industrialsRsPrev, consumerDiscretionaryRsPrev, consumerStaplesRsPrev, healthCareRsPrev, financialsRsPrev, informationTechnologyRsPrev, communicationServicesRsPrev, utilitiesRsPrev, realEstateRsPrev);
+def informationTechnologyRankPrev = RankFromValues(informationTechnologyRsPrev, energyRsPrev, materialsRsPrev, industrialsRsPrev, consumerDiscretionaryRsPrev, consumerStaplesRsPrev, healthCareRsPrev, financialsRsPrev, informationTechnologyRsPrev, communicationServicesRsPrev, utilitiesRsPrev, realEstateRsPrev);
+def communicationServicesRankPrev = RankFromValues(communicationServicesRsPrev, energyRsPrev, materialsRsPrev, industrialsRsPrev, consumerDiscretionaryRsPrev, consumerStaplesRsPrev, healthCareRsPrev, financialsRsPrev, informationTechnologyRsPrev, communicationServicesRsPrev, utilitiesRsPrev, realEstateRsPrev);
+def utilitiesRankPrev = RankFromValues(utilitiesRsPrev, energyRsPrev, materialsRsPrev, industrialsRsPrev, consumerDiscretionaryRsPrev, consumerStaplesRsPrev, healthCareRsPrev, financialsRsPrev, informationTechnologyRsPrev, communicationServicesRsPrev, utilitiesRsPrev, realEstateRsPrev);
+def realEstateRankPrev = RankFromValues(realEstateRsPrev, energyRsPrev, materialsRsPrev, industrialsRsPrev, consumerDiscretionaryRsPrev, consumerStaplesRsPrev, healthCareRsPrev, financialsRsPrev, informationTechnologyRsPrev, communicationServicesRsPrev, utilitiesRsPrev, realEstateRsPrev);
+
+def energyPlot = 11 - energyRank;
+def materialsPlot = 11 - materialsRank;
+def industrialsPlot = 11 - industrialsRank;
+def consumerDiscretionaryPlot = 11 - consumerDiscretionaryRank;
+def consumerStaplesPlot = 11 - consumerStaplesRank;
+def healthCarePlot = 11 - healthCareRank;
+def financialsPlot = 11 - financialsRank;
+def informationTechnologyPlot = 11 - informationTechnologyRank;
+def communicationServicesPlot = 11 - communicationServicesRank;
+def utilitiesPlot = 11 - utilitiesRank;
+def realEstatePlot = 11 - realEstateRank;
+
+def energyRankChange = energyRankPrev - energyRank;
+def materialsRankChange = materialsRankPrev - materialsRank;
+def industrialsRankChange = industrialsRankPrev - industrialsRank;
+def consumerDiscretionaryRankChange = consumerDiscretionaryRankPrev - consumerDiscretionaryRank;
+def consumerStaplesRankChange = consumerStaplesRankPrev - consumerStaplesRank;
+def healthCareRankChange = healthCareRankPrev - healthCareRank;
+def financialsRankChange = financialsRankPrev - financialsRank;
+def informationTechnologyRankChange = informationTechnologyRankPrev - informationTechnologyRank;
+def communicationServicesRankChange = communicationServicesRankPrev - communicationServicesRank;
+def utilitiesRankChange = utilitiesRankPrev - utilitiesRank;
+def realEstateRankChange = realEstateRankPrev - realEstateRank;
+
+plot TitleColorProxy = Double.NaN;
+TitleColorProxy.SetDefaultColor(Color.GRAY);
+TitleColorProxy.HideTitle();
+
+plot Energy = energyPlot;
+plot Materials = materialsPlot;
+plot Industrials = industrialsPlot;
+plot ConsumerDiscretionary = consumerDiscretionaryPlot;
+plot ConsumerStaples = consumerStaplesPlot;
+plot HealthCare = healthCarePlot;
+plot Financials = financialsPlot;
+plot InformationTechnology = informationTechnologyPlot;
+plot CommunicationServices = communicationServicesPlot;
+plot Utilities = utilitiesPlot;
+plot RealEstate = realEstatePlot;
+
+Energy.SetDefaultColor(GlobalColor("Energy"));
+Materials.SetDefaultColor(GlobalColor("Materials"));
+Industrials.SetDefaultColor(GlobalColor("Industrials"));
+ConsumerDiscretionary.SetDefaultColor(GlobalColor("ConsumerDiscretionary"));
+ConsumerStaples.SetDefaultColor(GlobalColor("ConsumerStaples"));
+HealthCare.SetDefaultColor(GlobalColor("HealthCare"));
+Financials.SetDefaultColor(GlobalColor("Financials"));
+InformationTechnology.SetDefaultColor(GlobalColor("InformationTechnology"));
+CommunicationServices.SetDefaultColor(GlobalColor("CommunicationServices"));
+Utilities.SetDefaultColor(GlobalColor("Utilities"));
+RealEstate.SetDefaultColor(GlobalColor("RealEstate"));
+
+Energy.SetLineWeight(2);
+Materials.SetLineWeight(2);
+Industrials.SetLineWeight(2);
+ConsumerDiscretionary.SetLineWeight(2);
+ConsumerStaples.SetLineWeight(2);
+HealthCare.SetLineWeight(2);
+Financials.SetLineWeight(2);
+InformationTechnology.SetLineWeight(2);
+CommunicationServices.SetLineWeight(2);
+Utilities.SetLineWeight(2);
+RealEstate.SetLineWeight(2);
+
+Energy.SetPaintingStrategy(PaintingStrategy.POINTS);
+Materials.SetPaintingStrategy(PaintingStrategy.POINTS);
+Industrials.SetPaintingStrategy(PaintingStrategy.POINTS);
+ConsumerDiscretionary.SetPaintingStrategy(PaintingStrategy.POINTS);
+ConsumerStaples.SetPaintingStrategy(PaintingStrategy.POINTS);
+HealthCare.SetPaintingStrategy(PaintingStrategy.POINTS);
+Financials.SetPaintingStrategy(PaintingStrategy.POINTS);
+InformationTechnology.SetPaintingStrategy(PaintingStrategy.POINTS);
+CommunicationServices.SetPaintingStrategy(PaintingStrategy.POINTS);
+Utilities.SetPaintingStrategy(PaintingStrategy.POINTS);
+RealEstate.SetPaintingStrategy(PaintingStrategy.POINTS);
+
+AddLabel(yes, " " + benchmark + " (" + relativeLookbackWeeks + "w RS)", Color.LIGHT_GRAY);
+AddLabel(showLabels, "EN #" +
+    (if energyRank == 1 then "1" else if energyRank == 2 then "2" else if energyRank == 3 then "3" else if energyRank == 4 then "4" else if energyRank == 5 then "5" else if energyRank == 6 then "6" else if energyRank == 7 then "7" else if energyRank == 8 then "8" else if energyRank == 9 then "9" else if energyRank == 10 then "10" else "11") +
+    " RS " + AsText(Round(energyRs, 1)), GlobalColor("Energy"));
+AddLabel(showLabels, "MAT #" +
+    (if materialsRank == 1 then "1" else if materialsRank == 2 then "2" else if materialsRank == 3 then "3" else if materialsRank == 4 then "4" else if materialsRank == 5 then "5" else if materialsRank == 6 then "6" else if materialsRank == 7 then "7" else if materialsRank == 8 then "8" else if materialsRank == 9 then "9" else if materialsRank == 10 then "10" else "11") +
+    " RS " + AsText(Round(materialsRs, 1)), GlobalColor("Materials"));
+AddLabel(showLabels, "IND #" +
+    (if industrialsRank == 1 then "1" else if industrialsRank == 2 then "2" else if industrialsRank == 3 then "3" else if industrialsRank == 4 then "4" else if industrialsRank == 5 then "5" else if industrialsRank == 6 then "6" else if industrialsRank == 7 then "7" else if industrialsRank == 8 then "8" else if industrialsRank == 9 then "9" else if industrialsRank == 10 then "10" else "11") +
+    " RS " + AsText(Round(industrialsRs, 1)), GlobalColor("Industrials"));
+AddLabel(showLabels, "CD #" +
+    (if consumerDiscretionaryRank == 1 then "1" else if consumerDiscretionaryRank == 2 then "2" else if consumerDiscretionaryRank == 3 then "3" else if consumerDiscretionaryRank == 4 then "4" else if consumerDiscretionaryRank == 5 then "5" else if consumerDiscretionaryRank == 6 then "6" else if consumerDiscretionaryRank == 7 then "7" else if consumerDiscretionaryRank == 8 then "8" else if consumerDiscretionaryRank == 9 then "9" else if consumerDiscretionaryRank == 10 then "10" else "11") +
+    " RS " + AsText(Round(consumerDiscretionaryRs, 1)), GlobalColor("ConsumerDiscretionary"));
+AddLabel(showLabels, "CS #" +
+    (if consumerStaplesRank == 1 then "1" else if consumerStaplesRank == 2 then "2" else if consumerStaplesRank == 3 then "3" else if consumerStaplesRank == 4 then "4" else if consumerStaplesRank == 5 then "5" else if consumerStaplesRank == 6 then "6" else if consumerStaplesRank == 7 then "7" else if consumerStaplesRank == 8 then "8" else if consumerStaplesRank == 9 then "9" else if consumerStaplesRank == 10 then "10" else "11") +
+    " RS " + AsText(Round(consumerStaplesRs, 1)), GlobalColor("ConsumerStaples"));
+AddLabel(showLabels, "HC #" +
+    (if healthCareRank == 1 then "1" else if healthCareRank == 2 then "2" else if healthCareRank == 3 then "3" else if healthCareRank == 4 then "4" else if healthCareRank == 5 then "5" else if healthCareRank == 6 then "6" else if healthCareRank == 7 then "7" else if healthCareRank == 8 then "8" else if healthCareRank == 9 then "9" else if healthCareRank == 10 then "10" else "11") +
+    " RS " + AsText(Round(healthCareRs, 1)), GlobalColor("HealthCare"));
+AddLabel(showLabels, "FIN #" +
+    (if financialsRank == 1 then "1" else if financialsRank == 2 then "2" else if financialsRank == 3 then "3" else if financialsRank == 4 then "4" else if financialsRank == 5 then "5" else if financialsRank == 6 then "6" else if financialsRank == 7 then "7" else if financialsRank == 8 then "8" else if financialsRank == 9 then "9" else if financialsRank == 10 then "10" else "11") +
+    " RS " + AsText(Round(financialsRs, 1)), GlobalColor("Financials"));
+AddLabel(showLabels, "IT #" +
+    (if informationTechnologyRank == 1 then "1" else if informationTechnologyRank == 2 then "2" else if informationTechnologyRank == 3 then "3" else if informationTechnologyRank == 4 then "4" else if informationTechnologyRank == 5 then "5" else if informationTechnologyRank == 6 then "6" else if informationTechnologyRank == 7 then "7" else if informationTechnologyRank == 8 then "8" else if informationTechnologyRank == 9 then "9" else if informationTechnologyRank == 10 then "10" else "11") +
+    " RS " + AsText(Round(informationTechnologyRs, 1)), GlobalColor("InformationTechnology"));
+AddLabel(showLabels, "COM #" +
+    (if communicationServicesRank == 1 then "1" else if communicationServicesRank == 2 then "2" else if communicationServicesRank == 3 then "3" else if communicationServicesRank == 4 then "4" else if communicationServicesRank == 5 then "5" else if communicationServicesRank == 6 then "6" else if communicationServicesRank == 7 then "7" else if communicationServicesRank == 8 then "8" else if communicationServicesRank == 9 then "9" else if communicationServicesRank == 10 then "10" else "11") +
+    " RS " + AsText(Round(communicationServicesRs, 1)), GlobalColor("CommunicationServices"));
+AddLabel(showLabels, "UTIL #" +
+    (if utilitiesRank == 1 then "1" else if utilitiesRank == 2 then "2" else if utilitiesRank == 3 then "3" else if utilitiesRank == 4 then "4" else if utilitiesRank == 5 then "5" else if utilitiesRank == 6 then "6" else if utilitiesRank == 7 then "7" else if utilitiesRank == 8 then "8" else if utilitiesRank == 9 then "9" else if utilitiesRank == 10 then "10" else "11") +
+    " RS " + AsText(Round(utilitiesRs, 1)), GlobalColor("Utilities"));
+AddLabel(showLabels, "RE #" +
+    (if realEstateRank == 1 then "1" else if realEstateRank == 2 then "2" else if realEstateRank == 3 then "3" else if realEstateRank == 4 then "4" else if realEstateRank == 5 then "5" else if realEstateRank == 6 then "6" else if realEstateRank == 7 then "7" else if realEstateRank == 8 then "8" else if realEstateRank == 9 then "9" else if realEstateRank == 10 then "10" else "11") +
+    " RS " + AsText(Round(realEstateRs, 1)), GlobalColor("RealEstate"));
+
+def lastBar = !IsNaN(close) and IsNaN(close[-1]);
+
+AddChartBubble(showBubbles and lastBar and energyRank == 1, energyPlot, "1 EN", GlobalColor("Energy"), no);
+AddChartBubble(showBubbles and lastBar and materialsRank == 1, materialsPlot, "1 MAT", GlobalColor("Materials"), no);
+AddChartBubble(showBubbles and lastBar and industrialsRank == 1, industrialsPlot, "1 IND", GlobalColor("Industrials"), no);
+AddChartBubble(showBubbles and lastBar and consumerDiscretionaryRank == 1, consumerDiscretionaryPlot, "1 CD", GlobalColor("ConsumerDiscretionary"), no);
+AddChartBubble(showBubbles and lastBar and consumerStaplesRank == 1, consumerStaplesPlot, "1 CS", GlobalColor("ConsumerStaples"), no);
+AddChartBubble(showBubbles and lastBar and healthCareRank == 1, healthCarePlot, "1 HC", GlobalColor("HealthCare"), no);
+AddChartBubble(showBubbles and lastBar and financialsRank == 1, financialsPlot, "1 FIN", GlobalColor("Financials"), no);
+AddChartBubble(showBubbles and lastBar and informationTechnologyRank == 1, informationTechnologyPlot, "1 IT", GlobalColor("InformationTechnology"), no);
+AddChartBubble(showBubbles and lastBar and communicationServicesRank == 1, communicationServicesPlot, "1 COM", GlobalColor("CommunicationServices"), no);
+AddChartBubble(showBubbles and lastBar and utilitiesRank == 1, utilitiesPlot, "1 UTIL", GlobalColor("Utilities"), no);
+AddChartBubble(showBubbles and lastBar and realEstateRank == 1, realEstatePlot, "1 RE", GlobalColor("RealEstate"), no);
+
+AddChartBubble(showBubbles and lastBar and energyRank == 2, energyPlot, "2 EN", GlobalColor("Energy"), no);
+AddChartBubble(showBubbles and lastBar and materialsRank == 2, materialsPlot, "2 MAT", GlobalColor("Materials"), no);
+AddChartBubble(showBubbles and lastBar and industrialsRank == 2, industrialsPlot, "2 IND", GlobalColor("Industrials"), no);
+AddChartBubble(showBubbles and lastBar and consumerDiscretionaryRank == 2, consumerDiscretionaryPlot, "2 CD", GlobalColor("ConsumerDiscretionary"), no);
+AddChartBubble(showBubbles and lastBar and consumerStaplesRank == 2, consumerStaplesPlot, "2 CS", GlobalColor("ConsumerStaples"), no);
+AddChartBubble(showBubbles and lastBar and healthCareRank == 2, healthCarePlot, "2 HC", GlobalColor("HealthCare"), no);
+AddChartBubble(showBubbles and lastBar and financialsRank == 2, financialsPlot, "2 FIN", GlobalColor("Financials"), no);
+AddChartBubble(showBubbles and lastBar and informationTechnologyRank == 2, informationTechnologyPlot, "2 IT", GlobalColor("InformationTechnology"), no);
+AddChartBubble(showBubbles and lastBar and communicationServicesRank == 2, communicationServicesPlot, "2 COM", GlobalColor("CommunicationServices"), no);
+AddChartBubble(showBubbles and lastBar and utilitiesRank == 2, utilitiesPlot, "2 UTIL", GlobalColor("Utilities"), no);
+AddChartBubble(showBubbles and lastBar and realEstateRank == 2, realEstatePlot, "2 RE", GlobalColor("RealEstate"), no);
+
+AddChartBubble(showBubbles and lastBar and energyRank == 3, energyPlot, "3 EN", GlobalColor("Energy"), no);
+AddChartBubble(showBubbles and lastBar and materialsRank == 3, materialsPlot, "3 MAT", GlobalColor("Materials"), no);
+AddChartBubble(showBubbles and lastBar and industrialsRank == 3, industrialsPlot, "3 IND", GlobalColor("Industrials"), no);
+AddChartBubble(showBubbles and lastBar and consumerDiscretionaryRank == 3, consumerDiscretionaryPlot, "3 CD", GlobalColor("ConsumerDiscretionary"), no);
+AddChartBubble(showBubbles and lastBar and consumerStaplesRank == 3, consumerStaplesPlot, "3 CS", GlobalColor("ConsumerStaples"), no);
+AddChartBubble(showBubbles and lastBar and healthCareRank == 3, healthCarePlot, "3 HC", GlobalColor("HealthCare"), no);
+AddChartBubble(showBubbles and lastBar and financialsRank == 3, financialsPlot, "3 FIN", GlobalColor("Financials"), no);
+AddChartBubble(showBubbles and lastBar and informationTechnologyRank == 3, informationTechnologyPlot, "3 IT", GlobalColor("InformationTechnology"), no);
+AddChartBubble(showBubbles and lastBar and communicationServicesRank == 3, communicationServicesPlot, "3 COM", GlobalColor("CommunicationServices"), no);
+AddChartBubble(showBubbles and lastBar and utilitiesRank == 3, utilitiesPlot, "3 UTIL", GlobalColor("Utilities"), no);
+AddChartBubble(showBubbles and lastBar and realEstateRank == 3, realEstatePlot, "3 RE", GlobalColor("RealEstate"), no);

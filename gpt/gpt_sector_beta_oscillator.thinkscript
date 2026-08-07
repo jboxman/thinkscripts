@@ -1,0 +1,455 @@
+#
+# Sector Beta Oscillator
+# ----------------------
+# This lower study compares each S&P 500 sector to a benchmark, defaulting
+# to SPX, by calculating rolling beta on 1-bar percent changes, smoothing
+# that beta series with an Ehlers Super Smoother style filter, and then
+# converting the smoothed values into a stochastic oscillator.
+#
+# What it shows:
+# - A normalized beta-momentum style oscillator for each sector
+# - Optional labels for every visible sector
+# - Optional ranked labels and last-bar bubbles for the current top 5 sectors
+#
+# Interpretation:
+# - Higher values mean the sector's recent beta is near the top of its
+#   own lookback range, which can indicate stronger participation in the
+#   current market move
+# - Lower values mean the sector's recent beta is near the bottom of its
+#   own lookback range, which can indicate fading participation
+# - This is best used as a momentum/rotation confirmation tool alongside
+#   relative-strength studies rather than as a standalone trend signal
+#
+# Typical use:
+# - Pair with a sector ranking study to find sectors that are both leading
+#   on relative performance and still showing improving beta momentum
+# - `BetaLength` controls the rolling beta window
+# - `StochLength` controls the normalization window
+# - Daily charts are the most natural fit for the default settings
+
+declare lower;
+
+input benchmark = "SPX";
+input BetaLength = 21;
+input StochLength = 34;
+input showLabels = yes;
+input showTop5 = yes;
+input showBubbles = yes;
+input showEnergy = yes;
+input showMaterials = yes;
+input showIndustrials = yes;
+input showConsumerDiscretionary = yes;
+input showConsumerStaples = yes;
+input showHealthCare = yes;
+input showFinancials = yes;
+input showInformationTechnology = yes;
+input showCommunicationServices = yes;
+input showUtilities = yes;
+input showRealEstate = yes;
+
+DefineGlobalColor("Energy", Color.RED);
+DefineGlobalColor("Materials", CreateColor(255, 140, 0));
+DefineGlobalColor("Industrials", CreateColor(255, 215, 0));
+DefineGlobalColor("ConsumerDiscretionary", CreateColor(255, 0, 255));
+DefineGlobalColor("ConsumerStaples", CreateColor(50, 205, 50));
+DefineGlobalColor("HealthCare", CreateColor(186, 85, 211));
+DefineGlobalColor("Financials", CreateColor(0, 191, 255));
+DefineGlobalColor("InformationTechnology", CreateColor(0, 120, 255));
+DefineGlobalColor("CommunicationServices", CreateColor(211, 211, 211));
+DefineGlobalColor("Utilities", Color.GREEN);
+DefineGlobalColor("RealEstate", CreateColor(255, 105, 180));
+
+script calcBeta {
+    input secondSymbol = "$SP500#40";
+    input refSymbol = "SPX";
+    input betaLength = 21;
+    input returnLength = 1;
+
+    def refPrice = close(symbol = refSymbol);
+    def secondPrice = close(symbol = secondSymbol);
+    def primary =
+        if IsNaN(refPrice) or IsNaN(refPrice[returnLength]) or refPrice[returnLength] == 0 then
+            Double.NaN
+        else
+            (refPrice - refPrice[returnLength]) / refPrice[returnLength] * 100;
+    def secondary =
+        if IsNaN(secondPrice) or IsNaN(secondPrice[returnLength]) or secondPrice[returnLength] == 0 then
+            Double.NaN
+        else
+            (secondPrice - secondPrice[returnLength]) / secondPrice[returnLength] * 100;
+    def variance = Sqr(StDev(primary, betaLength));
+    plot Beta =
+        if IsNaN(primary) or IsNaN(secondary) or variance <= 0 then
+            Double.NaN
+        else
+            Covariance(secondary, primary, betaLength) / variance;
+}
+
+script EhlersESSfilter {
+    input price = close;
+    input length = 8;
+    def ESS_coeff_0 = Exp(-Double.Pi * Sqrt(2) / length);
+    def ESS_coeff_2 = 2 * ESS_coeff_0 * Cos(Sqrt(2) * Double.Pi / length);
+    def ESS_coeff_3 = -Sqr(ESS_coeff_0);
+    def ESS_coeff_1 = 1 - ESS_coeff_2 - ESS_coeff_3;
+    def ESS_filter =
+        if IsNaN(price + price[1]) then
+            ESS_filter[1]
+        else
+            ESS_coeff_1 * (price + price[1]) / 2 +
+            ESS_coeff_2 * ESS_filter[1] +
+            ESS_coeff_3 * ESS_filter[2];
+    plot Smooth_Filter =
+        if BarNumber() < length then
+            price
+        else if !IsNaN(price) then
+            ESS_filter
+        else
+            Double.NaN;
+}
+
+script calcStoch {
+    input data = close;
+    input StochLength = 21;
+
+    def lowestValue = Lowest(data, StochLength);
+    def highestValue = Highest(data, StochLength);
+    def range = highestValue - lowestValue;
+    plot stoch =
+        if IsNaN(data) then
+            Double.NaN
+        else if range <= 0 then
+            0.5
+        else
+            (data - lowestValue) / range;
+}
+
+def upStochLimit = 0.80;
+def lowStochLimit = 0.20;
+def midpoint = 0.50;
+def hiddenValue = -1;
+def lastBar = !IsNaN(close) and IsNaN(close[-1]);
+
+def energyValue = calcStoch(data = EhlersESSfilter(price = calcBeta(secondSymbol = "$SP500#10", refSymbol = benchmark, betaLength = BetaLength)), StochLength = StochLength);
+def materialsValue = calcStoch(data = EhlersESSfilter(price = calcBeta(secondSymbol = "$SP500#15", refSymbol = benchmark, betaLength = BetaLength)), StochLength = StochLength);
+def industrialsValue = calcStoch(data = EhlersESSfilter(price = calcBeta(secondSymbol = "$SP500#20", refSymbol = benchmark, betaLength = BetaLength)), StochLength = StochLength);
+def consumerDiscretionaryValue = calcStoch(data = EhlersESSfilter(price = calcBeta(secondSymbol = "$SP500#25", refSymbol = benchmark, betaLength = BetaLength)), StochLength = StochLength);
+def consumerStaplesValue = calcStoch(data = EhlersESSfilter(price = calcBeta(secondSymbol = "$SP500#30", refSymbol = benchmark, betaLength = BetaLength)), StochLength = StochLength);
+def healthCareValue = calcStoch(data = EhlersESSfilter(price = calcBeta(secondSymbol = "$SP500#35", refSymbol = benchmark, betaLength = BetaLength)), StochLength = StochLength);
+def financialsValue = calcStoch(data = EhlersESSfilter(price = calcBeta(secondSymbol = "$SP500#40", refSymbol = benchmark, betaLength = BetaLength)), StochLength = StochLength);
+def informationTechnologyValue = calcStoch(data = EhlersESSfilter(price = calcBeta(secondSymbol = "$SP500#45", refSymbol = benchmark, betaLength = BetaLength)), StochLength = StochLength);
+def communicationServicesValue = calcStoch(data = EhlersESSfilter(price = calcBeta(secondSymbol = "$SP500#50", refSymbol = benchmark, betaLength = BetaLength)), StochLength = StochLength);
+def utilitiesValue = calcStoch(data = EhlersESSfilter(price = calcBeta(secondSymbol = "$SP500#55", refSymbol = benchmark, betaLength = BetaLength)), StochLength = StochLength);
+def realEstateValue = calcStoch(data = EhlersESSfilter(price = calcBeta(secondSymbol = "$SP500#60", refSymbol = benchmark, betaLength = BetaLength)), StochLength = StochLength);
+
+plot TitleColorProxy = Double.NaN;
+TitleColorProxy.SetDefaultColor(Color.GRAY);
+TitleColorProxy.HideTitle();
+
+plot Energy = if showEnergy then energyValue else Double.NaN;
+plot Materials = if showMaterials then materialsValue else Double.NaN;
+plot Industrials = if showIndustrials then industrialsValue else Double.NaN;
+plot ConsumerDiscretionary = if showConsumerDiscretionary then consumerDiscretionaryValue else Double.NaN;
+plot ConsumerStaples = if showConsumerStaples then consumerStaplesValue else Double.NaN;
+plot HealthCare = if showHealthCare then healthCareValue else Double.NaN;
+plot Financials = if showFinancials then financialsValue else Double.NaN;
+plot InformationTechnology = if showInformationTechnology then informationTechnologyValue else Double.NaN;
+plot CommunicationServices = if showCommunicationServices then communicationServicesValue else Double.NaN;
+plot Utilities = if showUtilities then utilitiesValue else Double.NaN;
+plot RealEstate = if showRealEstate then realEstateValue else Double.NaN;
+
+Energy.SetDefaultColor(GlobalColor("Energy"));
+Materials.SetDefaultColor(GlobalColor("Materials"));
+Industrials.SetDefaultColor(GlobalColor("Industrials"));
+ConsumerDiscretionary.SetDefaultColor(GlobalColor("ConsumerDiscretionary"));
+ConsumerStaples.SetDefaultColor(GlobalColor("ConsumerStaples"));
+HealthCare.SetDefaultColor(GlobalColor("HealthCare"));
+Financials.SetDefaultColor(GlobalColor("Financials"));
+InformationTechnology.SetDefaultColor(GlobalColor("InformationTechnology"));
+CommunicationServices.SetDefaultColor(GlobalColor("CommunicationServices"));
+Utilities.SetDefaultColor(GlobalColor("Utilities"));
+RealEstate.SetDefaultColor(GlobalColor("RealEstate"));
+
+AddLabel(yes, "Sector Beta Stoch (" + BetaLength + "," + StochLength + ") vs " + benchmark, Color.LIGHT_GRAY);
+AddLabel(showLabels and showEnergy and !IsNaN(energyValue), "EN Energy " + AsText(Round(energyValue, 2)), GlobalColor("Energy"));
+AddLabel(showLabels and showMaterials and !IsNaN(materialsValue), "MAT Materials " + AsText(Round(materialsValue, 2)), GlobalColor("Materials"));
+AddLabel(showLabels and showIndustrials and !IsNaN(industrialsValue), "IND Industrials " + AsText(Round(industrialsValue, 2)), GlobalColor("Industrials"));
+AddLabel(showLabels and showConsumerDiscretionary and !IsNaN(consumerDiscretionaryValue), "CD Consumer disc " + AsText(Round(consumerDiscretionaryValue, 2)), GlobalColor("ConsumerDiscretionary"));
+AddLabel(showLabels and showConsumerStaples and !IsNaN(consumerStaplesValue), "CS Consumer staples " + AsText(Round(consumerStaplesValue, 2)), GlobalColor("ConsumerStaples"));
+AddLabel(showLabels and showHealthCare and !IsNaN(healthCareValue), "HC Health care " + AsText(Round(healthCareValue, 2)), GlobalColor("HealthCare"));
+AddLabel(showLabels and showFinancials and !IsNaN(financialsValue), "FIN Financials " + AsText(Round(financialsValue, 2)), GlobalColor("Financials"));
+AddLabel(showLabels and showInformationTechnology and !IsNaN(informationTechnologyValue), "IT Info tech " + AsText(Round(informationTechnologyValue, 2)), GlobalColor("InformationTechnology"));
+AddLabel(showLabels and showCommunicationServices and !IsNaN(communicationServicesValue), "COM Comm svcs " + AsText(Round(communicationServicesValue, 2)), GlobalColor("CommunicationServices"));
+AddLabel(showLabels and showUtilities and !IsNaN(utilitiesValue), "UTIL Utilities " + AsText(Round(utilitiesValue, 2)), GlobalColor("Utilities"));
+AddLabel(showLabels and showRealEstate and !IsNaN(realEstateValue), "RE Real estate " + AsText(Round(realEstateValue, 2)), GlobalColor("RealEstate"));
+
+def rankEnergy = if showEnergy and !IsNaN(energyValue) then energyValue else hiddenValue;
+def rankMaterials = if showMaterials and !IsNaN(materialsValue) then materialsValue else hiddenValue;
+def rankIndustrials = if showIndustrials and !IsNaN(industrialsValue) then industrialsValue else hiddenValue;
+def rankConsumerDiscretionary = if showConsumerDiscretionary and !IsNaN(consumerDiscretionaryValue) then consumerDiscretionaryValue else hiddenValue;
+def rankConsumerStaples = if showConsumerStaples and !IsNaN(consumerStaplesValue) then consumerStaplesValue else hiddenValue;
+def rankHealthCare = if showHealthCare and !IsNaN(healthCareValue) then healthCareValue else hiddenValue;
+def rankFinancials = if showFinancials and !IsNaN(financialsValue) then financialsValue else hiddenValue;
+def rankInformationTechnology = if showInformationTechnology and !IsNaN(informationTechnologyValue) then informationTechnologyValue else hiddenValue;
+def rankCommunicationServices = if showCommunicationServices and !IsNaN(communicationServicesValue) then communicationServicesValue else hiddenValue;
+def rankUtilities = if showUtilities and !IsNaN(utilitiesValue) then utilitiesValue else hiddenValue;
+def rankRealEstate = if showRealEstate and !IsNaN(realEstateValue) then realEstateValue else hiddenValue;
+
+def rank1 = Max(rankEnergy,
+            Max(rankMaterials,
+            Max(rankIndustrials,
+            Max(rankConsumerDiscretionary,
+            Max(rankConsumerStaples,
+            Max(rankHealthCare,
+            Max(rankFinancials,
+            Max(rankInformationTechnology,
+            Max(rankCommunicationServices,
+            Max(rankUtilities, rankRealEstate))))))))));
+def rank2 = Max(if rankEnergy < rank1 then rankEnergy else hiddenValue,
+            Max(if rankMaterials < rank1 then rankMaterials else hiddenValue,
+            Max(if rankIndustrials < rank1 then rankIndustrials else hiddenValue,
+            Max(if rankConsumerDiscretionary < rank1 then rankConsumerDiscretionary else hiddenValue,
+            Max(if rankConsumerStaples < rank1 then rankConsumerStaples else hiddenValue,
+            Max(if rankHealthCare < rank1 then rankHealthCare else hiddenValue,
+            Max(if rankFinancials < rank1 then rankFinancials else hiddenValue,
+            Max(if rankInformationTechnology < rank1 then rankInformationTechnology else hiddenValue,
+            Max(if rankCommunicationServices < rank1 then rankCommunicationServices else hiddenValue,
+            Max(if rankUtilities < rank1 then rankUtilities else hiddenValue,
+                if rankRealEstate < rank1 then rankRealEstate else hiddenValue))))))))));
+def rank3 = Max(if rankEnergy < rank2 then rankEnergy else hiddenValue,
+            Max(if rankMaterials < rank2 then rankMaterials else hiddenValue,
+            Max(if rankIndustrials < rank2 then rankIndustrials else hiddenValue,
+            Max(if rankConsumerDiscretionary < rank2 then rankConsumerDiscretionary else hiddenValue,
+            Max(if rankConsumerStaples < rank2 then rankConsumerStaples else hiddenValue,
+            Max(if rankHealthCare < rank2 then rankHealthCare else hiddenValue,
+            Max(if rankFinancials < rank2 then rankFinancials else hiddenValue,
+            Max(if rankInformationTechnology < rank2 then rankInformationTechnology else hiddenValue,
+            Max(if rankCommunicationServices < rank2 then rankCommunicationServices else hiddenValue,
+            Max(if rankUtilities < rank2 then rankUtilities else hiddenValue,
+                if rankRealEstate < rank2 then rankRealEstate else hiddenValue))))))))));
+def rank4 = Max(if rankEnergy < rank3 then rankEnergy else hiddenValue,
+            Max(if rankMaterials < rank3 then rankMaterials else hiddenValue,
+            Max(if rankIndustrials < rank3 then rankIndustrials else hiddenValue,
+            Max(if rankConsumerDiscretionary < rank3 then rankConsumerDiscretionary else hiddenValue,
+            Max(if rankConsumerStaples < rank3 then rankConsumerStaples else hiddenValue,
+            Max(if rankHealthCare < rank3 then rankHealthCare else hiddenValue,
+            Max(if rankFinancials < rank3 then rankFinancials else hiddenValue,
+            Max(if rankInformationTechnology < rank3 then rankInformationTechnology else hiddenValue,
+            Max(if rankCommunicationServices < rank3 then rankCommunicationServices else hiddenValue,
+            Max(if rankUtilities < rank3 then rankUtilities else hiddenValue,
+                if rankRealEstate < rank3 then rankRealEstate else hiddenValue))))))))));
+def rank5 = Max(if rankEnergy < rank4 then rankEnergy else hiddenValue,
+            Max(if rankMaterials < rank4 then rankMaterials else hiddenValue,
+            Max(if rankIndustrials < rank4 then rankIndustrials else hiddenValue,
+            Max(if rankConsumerDiscretionary < rank4 then rankConsumerDiscretionary else hiddenValue,
+            Max(if rankConsumerStaples < rank4 then rankConsumerStaples else hiddenValue,
+            Max(if rankHealthCare < rank4 then rankHealthCare else hiddenValue,
+            Max(if rankFinancials < rank4 then rankFinancials else hiddenValue,
+            Max(if rankInformationTechnology < rank4 then rankInformationTechnology else hiddenValue,
+            Max(if rankCommunicationServices < rank4 then rankCommunicationServices else hiddenValue,
+            Max(if rankUtilities < rank4 then rankUtilities else hiddenValue,
+                if rankRealEstate < rank4 then rankRealEstate else hiddenValue))))))))));
+
+AddLabel(showTop5 and rank1 > hiddenValue, "1 " +
+    (if rank1 == rankEnergy then "EN Energy"
+     else if rank1 == rankMaterials then "MAT Materials"
+     else if rank1 == rankIndustrials then "IND Industrials"
+     else if rank1 == rankConsumerDiscretionary then "CD Consumer disc"
+     else if rank1 == rankConsumerStaples then "CS Consumer staples"
+     else if rank1 == rankHealthCare then "HC Health care"
+     else if rank1 == rankFinancials then "FIN Financials"
+     else if rank1 == rankInformationTechnology then "IT Info tech"
+     else if rank1 == rankCommunicationServices then "COM Comm svcs"
+     else if rank1 == rankUtilities then "UTIL Utilities"
+     else "RE Real estate") + " " + AsText(Round(rank1, 2)),
+    if rank1 == rankEnergy then GlobalColor("Energy")
+    else if rank1 == rankMaterials then GlobalColor("Materials")
+    else if rank1 == rankIndustrials then GlobalColor("Industrials")
+    else if rank1 == rankConsumerDiscretionary then GlobalColor("ConsumerDiscretionary")
+    else if rank1 == rankConsumerStaples then GlobalColor("ConsumerStaples")
+    else if rank1 == rankHealthCare then GlobalColor("HealthCare")
+    else if rank1 == rankFinancials then GlobalColor("Financials")
+    else if rank1 == rankInformationTechnology then GlobalColor("InformationTechnology")
+    else if rank1 == rankCommunicationServices then GlobalColor("CommunicationServices")
+    else if rank1 == rankUtilities then GlobalColor("Utilities")
+    else GlobalColor("RealEstate"));
+AddLabel(showTop5 and rank2 > hiddenValue, "2 " +
+    (if rank2 == rankEnergy then "EN Energy"
+     else if rank2 == rankMaterials then "MAT Materials"
+     else if rank2 == rankIndustrials then "IND Industrials"
+     else if rank2 == rankConsumerDiscretionary then "CD Consumer disc"
+     else if rank2 == rankConsumerStaples then "CS Consumer staples"
+     else if rank2 == rankHealthCare then "HC Health care"
+     else if rank2 == rankFinancials then "FIN Financials"
+     else if rank2 == rankInformationTechnology then "IT Info tech"
+     else if rank2 == rankCommunicationServices then "COM Comm svcs"
+     else if rank2 == rankUtilities then "UTIL Utilities"
+     else "RE Real estate") + " " + AsText(Round(rank2, 2)),
+    if rank2 == rankEnergy then GlobalColor("Energy")
+    else if rank2 == rankMaterials then GlobalColor("Materials")
+    else if rank2 == rankIndustrials then GlobalColor("Industrials")
+    else if rank2 == rankConsumerDiscretionary then GlobalColor("ConsumerDiscretionary")
+    else if rank2 == rankConsumerStaples then GlobalColor("ConsumerStaples")
+    else if rank2 == rankHealthCare then GlobalColor("HealthCare")
+    else if rank2 == rankFinancials then GlobalColor("Financials")
+    else if rank2 == rankInformationTechnology then GlobalColor("InformationTechnology")
+    else if rank2 == rankCommunicationServices then GlobalColor("CommunicationServices")
+    else if rank2 == rankUtilities then GlobalColor("Utilities")
+    else GlobalColor("RealEstate"));
+AddLabel(showTop5 and rank3 > hiddenValue, "3 " +
+    (if rank3 == rankEnergy then "EN Energy"
+     else if rank3 == rankMaterials then "MAT Materials"
+     else if rank3 == rankIndustrials then "IND Industrials"
+     else if rank3 == rankConsumerDiscretionary then "CD Consumer disc"
+     else if rank3 == rankConsumerStaples then "CS Consumer staples"
+     else if rank3 == rankHealthCare then "HC Health care"
+     else if rank3 == rankFinancials then "FIN Financials"
+     else if rank3 == rankInformationTechnology then "IT Info tech"
+     else if rank3 == rankCommunicationServices then "COM Comm svcs"
+     else if rank3 == rankUtilities then "UTIL Utilities"
+     else "RE Real estate") + " " + AsText(Round(rank3, 2)),
+    if rank3 == rankEnergy then GlobalColor("Energy")
+    else if rank3 == rankMaterials then GlobalColor("Materials")
+    else if rank3 == rankIndustrials then GlobalColor("Industrials")
+    else if rank3 == rankConsumerDiscretionary then GlobalColor("ConsumerDiscretionary")
+    else if rank3 == rankConsumerStaples then GlobalColor("ConsumerStaples")
+    else if rank3 == rankHealthCare then GlobalColor("HealthCare")
+    else if rank3 == rankFinancials then GlobalColor("Financials")
+    else if rank3 == rankInformationTechnology then GlobalColor("InformationTechnology")
+    else if rank3 == rankCommunicationServices then GlobalColor("CommunicationServices")
+    else if rank3 == rankUtilities then GlobalColor("Utilities")
+    else GlobalColor("RealEstate"));
+AddLabel(showTop5 and rank4 > hiddenValue, "4 " +
+    (if rank4 == rankEnergy then "EN Energy"
+     else if rank4 == rankMaterials then "MAT Materials"
+     else if rank4 == rankIndustrials then "IND Industrials"
+     else if rank4 == rankConsumerDiscretionary then "CD Consumer disc"
+     else if rank4 == rankConsumerStaples then "CS Consumer staples"
+     else if rank4 == rankHealthCare then "HC Health care"
+     else if rank4 == rankFinancials then "FIN Financials"
+     else if rank4 == rankInformationTechnology then "IT Info tech"
+     else if rank4 == rankCommunicationServices then "COM Comm svcs"
+     else if rank4 == rankUtilities then "UTIL Utilities"
+     else "RE Real estate") + " " + AsText(Round(rank4, 2)),
+    if rank4 == rankEnergy then GlobalColor("Energy")
+    else if rank4 == rankMaterials then GlobalColor("Materials")
+    else if rank4 == rankIndustrials then GlobalColor("Industrials")
+    else if rank4 == rankConsumerDiscretionary then GlobalColor("ConsumerDiscretionary")
+    else if rank4 == rankConsumerStaples then GlobalColor("ConsumerStaples")
+    else if rank4 == rankHealthCare then GlobalColor("HealthCare")
+    else if rank4 == rankFinancials then GlobalColor("Financials")
+    else if rank4 == rankInformationTechnology then GlobalColor("InformationTechnology")
+    else if rank4 == rankCommunicationServices then GlobalColor("CommunicationServices")
+    else if rank4 == rankUtilities then GlobalColor("Utilities")
+    else GlobalColor("RealEstate"));
+AddLabel(showTop5 and rank5 > hiddenValue, "5 " +
+    (if rank5 == rankEnergy then "EN Energy"
+     else if rank5 == rankMaterials then "MAT Materials"
+     else if rank5 == rankIndustrials then "IND Industrials"
+     else if rank5 == rankConsumerDiscretionary then "CD Consumer disc"
+     else if rank5 == rankConsumerStaples then "CS Consumer staples"
+     else if rank5 == rankHealthCare then "HC Health care"
+     else if rank5 == rankFinancials then "FIN Financials"
+     else if rank5 == rankInformationTechnology then "IT Info tech"
+     else if rank5 == rankCommunicationServices then "COM Comm svcs"
+     else if rank5 == rankUtilities then "UTIL Utilities"
+     else "RE Real estate") + " " + AsText(Round(rank5, 2)),
+    if rank5 == rankEnergy then GlobalColor("Energy")
+    else if rank5 == rankMaterials then GlobalColor("Materials")
+    else if rank5 == rankIndustrials then GlobalColor("Industrials")
+    else if rank5 == rankConsumerDiscretionary then GlobalColor("ConsumerDiscretionary")
+    else if rank5 == rankConsumerStaples then GlobalColor("ConsumerStaples")
+    else if rank5 == rankHealthCare then GlobalColor("HealthCare")
+    else if rank5 == rankFinancials then GlobalColor("Financials")
+    else if rank5 == rankInformationTechnology then GlobalColor("InformationTechnology")
+    else if rank5 == rankCommunicationServices then GlobalColor("CommunicationServices")
+    else if rank5 == rankUtilities then GlobalColor("Utilities")
+    else GlobalColor("RealEstate"));
+
+AddChartBubble(showBubbles and lastBar and rank1 > hiddenValue, rank1,
+    "1 " +
+    (if rank1 == rankEnergy then "EN"
+     else if rank1 == rankMaterials then "MAT"
+     else if rank1 == rankIndustrials then "IND"
+     else if rank1 == rankConsumerDiscretionary then "CD"
+     else if rank1 == rankConsumerStaples then "CS"
+     else if rank1 == rankHealthCare then "HC"
+     else if rank1 == rankFinancials then "FIN"
+     else if rank1 == rankInformationTechnology then "IT"
+     else if rank1 == rankCommunicationServices then "COM"
+     else if rank1 == rankUtilities then "UTIL"
+     else "RE") + " " + AsText(Round(rank1, 2)),
+    if rank1 == rankEnergy then GlobalColor("Energy")
+    else if rank1 == rankMaterials then GlobalColor("Materials")
+    else if rank1 == rankIndustrials then GlobalColor("Industrials")
+    else if rank1 == rankConsumerDiscretionary then GlobalColor("ConsumerDiscretionary")
+    else if rank1 == rankConsumerStaples then GlobalColor("ConsumerStaples")
+    else if rank1 == rankHealthCare then GlobalColor("HealthCare")
+    else if rank1 == rankFinancials then GlobalColor("Financials")
+    else if rank1 == rankInformationTechnology then GlobalColor("InformationTechnology")
+    else if rank1 == rankCommunicationServices then GlobalColor("CommunicationServices")
+    else if rank1 == rankUtilities then GlobalColor("Utilities")
+    else GlobalColor("RealEstate"),
+    yes);
+AddChartBubble(showBubbles and lastBar and rank2 > hiddenValue, rank2,
+    "2 " +
+    (if rank2 == rankEnergy then "EN"
+     else if rank2 == rankMaterials then "MAT"
+     else if rank2 == rankIndustrials then "IND"
+     else if rank2 == rankConsumerDiscretionary then "CD"
+     else if rank2 == rankConsumerStaples then "CS"
+     else if rank2 == rankHealthCare then "HC"
+     else if rank2 == rankFinancials then "FIN"
+     else if rank2 == rankInformationTechnology then "IT"
+     else if rank2 == rankCommunicationServices then "COM"
+     else if rank2 == rankUtilities then "UTIL"
+     else "RE") + " " + AsText(Round(rank2, 2)),
+    if rank2 == rankEnergy then GlobalColor("Energy")
+    else if rank2 == rankMaterials then GlobalColor("Materials")
+    else if rank2 == rankIndustrials then GlobalColor("Industrials")
+    else if rank2 == rankConsumerDiscretionary then GlobalColor("ConsumerDiscretionary")
+    else if rank2 == rankConsumerStaples then GlobalColor("ConsumerStaples")
+    else if rank2 == rankHealthCare then GlobalColor("HealthCare")
+    else if rank2 == rankFinancials then GlobalColor("Financials")
+    else if rank2 == rankInformationTechnology then GlobalColor("InformationTechnology")
+    else if rank2 == rankCommunicationServices then GlobalColor("CommunicationServices")
+    else if rank2 == rankUtilities then GlobalColor("Utilities")
+    else GlobalColor("RealEstate"),
+    yes);
+AddChartBubble(showBubbles and lastBar and rank3 > hiddenValue, rank3,
+    "3 " +
+    (if rank3 == rankEnergy then "EN"
+     else if rank3 == rankMaterials then "MAT"
+     else if rank3 == rankIndustrials then "IND"
+     else if rank3 == rankConsumerDiscretionary then "CD"
+     else if rank3 == rankConsumerStaples then "CS"
+     else if rank3 == rankHealthCare then "HC"
+     else if rank3 == rankFinancials then "FIN"
+     else if rank3 == rankInformationTechnology then "IT"
+     else if rank3 == rankCommunicationServices then "COM"
+     else if rank3 == rankUtilities then "UTIL"
+     else "RE") + " " + AsText(Round(rank3, 2)),
+    if rank3 == rankEnergy then GlobalColor("Energy")
+    else if rank3 == rankMaterials then GlobalColor("Materials")
+    else if rank3 == rankIndustrials then GlobalColor("Industrials")
+    else if rank3 == rankConsumerDiscretionary then GlobalColor("ConsumerDiscretionary")
+    else if rank3 == rankConsumerStaples then GlobalColor("ConsumerStaples")
+    else if rank3 == rankHealthCare then GlobalColor("HealthCare")
+    else if rank3 == rankFinancials then GlobalColor("Financials")
+    else if rank3 == rankInformationTechnology then GlobalColor("InformationTechnology")
+    else if rank3 == rankCommunicationServices then GlobalColor("CommunicationServices")
+    else if rank3 == rankUtilities then GlobalColor("Utilities")
+    else GlobalColor("RealEstate"),
+    yes);
+
+plot UpperLine = upStochLimit;
+plot MidLine = midpoint;
+plot LowerLine = lowStochLimit;
+
+UpperLine.SetDefaultColor(Color.GREEN);
+MidLine.SetDefaultColor(Color.GRAY);
+LowerLine.SetDefaultColor(Color.RED);
+
+UpperLine.SetStyle(Curve.SHORT_DASH);
+MidLine.SetStyle(Curve.SHORT_DASH);
+LowerLine.SetStyle(Curve.SHORT_DASH);

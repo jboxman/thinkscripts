@@ -1,0 +1,139 @@
+# SPX Breadth Regime
+# Uses the percentage of S&P 500 stocks above their 50-, 100-, and
+# 200-day simple moving averages.
+#
+# Intended for a DAILY chart. Thinkorswim supplies these symbols as decimal
+# fractions (0.62 = 62%), so the default converts them to a 0-100 scale.
+
+declare lower;
+declare hide_on_intraday;
+
+input dataAreDecimalFractions = yes;
+input benchmarkSymbol = "$SPX";
+input divergenceLength = 20;
+input thrustLookback = 10;
+input showAlignmentCloud = yes;
+input showDivergences = yes;
+
+def raw50 = close("$SPXA50R");
+def raw100 = close("$SPXA100R");
+def raw200 = close("$SPXA200R");
+def scale = if dataAreDecimalFractions then 100 else 1;
+
+def pct50 = raw50 * scale;
+def pct100 = raw100 * scale;
+def pct200 = raw200 * scale;
+def dataAvailable = !IsNaN(pct50) and !IsNaN(pct100) and !IsNaN(pct200);
+
+plot Above50 = pct50;
+Above50.SetDefaultColor(Color.CYAN);
+Above50.SetLineWeight(2);
+
+plot Above100 = pct100;
+Above100.SetDefaultColor(Color.ORANGE);
+Above100.SetLineWeight(2);
+
+plot Above200 = pct200;
+Above200.SetDefaultColor(Color.GREEN);
+Above200.SetLineWeight(2);
+
+plot UpperBand = 80;
+UpperBand.SetDefaultColor(Color.DARK_GRAY);
+UpperBand.SetStyle(Curve.SHORT_DASH);
+
+plot HealthyBand = 60;
+HealthyBand.SetDefaultColor(Color.DARK_GRAY);
+HealthyBand.SetStyle(Curve.SHORT_DASH);
+
+plot Midline = 50;
+Midline.SetDefaultColor(Color.GRAY);
+Midline.SetStyle(Curve.LONG_DASH);
+
+plot WeakBand = 40;
+WeakBand.SetDefaultColor(Color.DARK_GRAY);
+WeakBand.SetStyle(Curve.SHORT_DASH);
+
+plot LowerBand = 20;
+LowerBand.SetDefaultColor(Color.DARK_GRAY);
+LowerBand.SetStyle(Curve.SHORT_DASH);
+
+def bullishAlignment = pct50 > pct100 and pct100 > pct200;
+def bearishAlignment = pct50 < pct100 and pct100 < pct200;
+def acceleration = pct50 - pct200;
+
+AddCloud(
+    if showAlignmentCloud and bullishAlignment then Above50 else Double.NaN,
+    if showAlignmentCloud and bullishAlignment then Above200 else Double.NaN,
+    Color.DARK_GREEN,
+    Color.DARK_GREEN
+);
+AddCloud(
+    if showAlignmentCloud and bearishAlignment then Above200 else Double.NaN,
+    if showAlignmentCloud and bearishAlignment then Above50 else Double.NaN,
+    Color.DARK_RED,
+    Color.DARK_RED
+);
+
+def benchmark = close(benchmarkSymbol);
+def priceNewHigh = benchmark >= Highest(benchmark[1], divergenceLength);
+def priceNewLow = benchmark <= Lowest(benchmark[1], divergenceLength);
+def breadthBelowPriorHigh = pct50 < Highest(pct50[1], divergenceLength);
+def breadthAbovePriorLow = pct50 > Lowest(pct50[1], divergenceLength);
+def bearishDivergence = priceNewHigh and breadthBelowPriorHigh;
+def bullishDivergence = priceNewLow and breadthAbovePriorLow;
+
+plot BearishBreadthDivergence =
+    if showDivergences and bearishDivergence then pct50 else Double.NaN;
+BearishBreadthDivergence.SetPaintingStrategy(PaintingStrategy.ARROW_DOWN);
+BearishBreadthDivergence.SetDefaultColor(Color.RED);
+BearishBreadthDivergence.SetLineWeight(3);
+
+plot BullishBreadthDivergence =
+    if showDivergences and bullishDivergence then pct50 else Double.NaN;
+BullishBreadthDivergence.SetPaintingStrategy(PaintingStrategy.ARROW_UP);
+BullishBreadthDivergence.SetDefaultColor(Color.GREEN);
+BullishBreadthDivergence.SetLineWeight(3);
+
+def recentWashout = Lowest(pct50[1], thrustLookback) < 20;
+def breadthThrust = pct50 > 50 and pct50[1] <= 50 and recentWashout;
+
+AddLabel(
+    yes,
+    if !dataAvailable then "SPX BREADTH DATA UNAVAILABLE"
+    else if bullishAlignment and pct200 >= 60 then "BROAD RISK-ON"
+    else if bullishAlignment then "BREADTH ACCELERATING"
+    else if bearishAlignment and pct200 <= 40 then "BROAD RISK-OFF"
+    else if bearishAlignment then "BREADTH DECELERATING"
+    else "BREADTH MIXED",
+    if !dataAvailable then Color.GRAY
+    else if bullishAlignment and pct200 >= 60 then Color.GREEN
+    else if bullishAlignment then Color.DARK_GREEN
+    else if bearishAlignment and pct200 <= 40 then Color.RED
+    else if bearishAlignment then Color.DARK_RED
+    else Color.YELLOW
+);
+
+AddLabel(
+    dataAvailable,
+    "50D " + Round(pct50, 1) + "%",
+    if pct50 >= 60 then Color.GREEN else if pct50 <= 40 then Color.RED else Color.GRAY
+);
+AddLabel(
+    dataAvailable,
+    "100D " + Round(pct100, 1) + "%",
+    if pct100 >= 60 then Color.GREEN else if pct100 <= 40 then Color.RED else Color.GRAY
+);
+AddLabel(
+    dataAvailable,
+    "200D " + Round(pct200, 1) + "%",
+    if pct200 >= 60 then Color.GREEN else if pct200 <= 40 then Color.RED else Color.GRAY
+);
+AddLabel(
+    dataAvailable,
+    "ACCEL " + Round(acceleration, 1),
+    if acceleration > 5 then Color.GREEN else if acceleration < -5 then Color.RED else Color.GRAY
+);
+AddLabel(breadthThrust, "50D BREADTH THRUST", Color.GREEN);
+AddLabel(showDivergences and bearishDivergence, "BEARISH DIVERGENCE", Color.RED);
+AddLabel(showDivergences and bullishDivergence, "BULLISH DIVERGENCE", Color.GREEN);
+
