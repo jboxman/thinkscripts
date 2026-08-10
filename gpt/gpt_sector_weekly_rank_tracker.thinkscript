@@ -9,7 +9,7 @@
 #   minus benchmark return over the same weekly window.
 #
 # What it shows:
-# - Cross-sectional rank of each sector from 1 to 11 on each bar
+# - Connected rank lines for each sector from 1 to 11 on each bar
 # - A label for each sector showing its current rank and weekly RS value
 # - Optional last-bar bubbles for the current top 3 ranked sectors
 #
@@ -216,17 +216,17 @@ CommunicationServices.SetLineWeight(2);
 Utilities.SetLineWeight(2);
 RealEstate.SetLineWeight(2);
 
-Energy.SetPaintingStrategy(PaintingStrategy.POINTS);
-Materials.SetPaintingStrategy(PaintingStrategy.POINTS);
-Industrials.SetPaintingStrategy(PaintingStrategy.POINTS);
-ConsumerDiscretionary.SetPaintingStrategy(PaintingStrategy.POINTS);
-ConsumerStaples.SetPaintingStrategy(PaintingStrategy.POINTS);
-HealthCare.SetPaintingStrategy(PaintingStrategy.POINTS);
-Financials.SetPaintingStrategy(PaintingStrategy.POINTS);
-InformationTechnology.SetPaintingStrategy(PaintingStrategy.POINTS);
-CommunicationServices.SetPaintingStrategy(PaintingStrategy.POINTS);
-Utilities.SetPaintingStrategy(PaintingStrategy.POINTS);
-RealEstate.SetPaintingStrategy(PaintingStrategy.POINTS);
+Energy.SetPaintingStrategy(PaintingStrategy.LINE);
+Materials.SetPaintingStrategy(PaintingStrategy.LINE);
+Industrials.SetPaintingStrategy(PaintingStrategy.LINE);
+ConsumerDiscretionary.SetPaintingStrategy(PaintingStrategy.LINE);
+ConsumerStaples.SetPaintingStrategy(PaintingStrategy.LINE);
+HealthCare.SetPaintingStrategy(PaintingStrategy.LINE);
+Financials.SetPaintingStrategy(PaintingStrategy.LINE);
+InformationTechnology.SetPaintingStrategy(PaintingStrategy.LINE);
+CommunicationServices.SetPaintingStrategy(PaintingStrategy.LINE);
+Utilities.SetPaintingStrategy(PaintingStrategy.LINE);
+RealEstate.SetPaintingStrategy(PaintingStrategy.LINE);
 
 AddLabel(yes, " " + benchmark + " (" + relativeLookbackWeeks + "w RS)", Color.LIGHT_GRAY);
 AddLabel(showLabels, "EN #" +
