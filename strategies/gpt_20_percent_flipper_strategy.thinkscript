@@ -1,0 +1,428 @@
+# 20% Flipper Strategy
+#
+# Rules:
+#   - While flat, track the lowest closing price (or intraday low).
+#   - Buy at the next bar's open after a close at least entryPercent above that
+#     low.
+#   - While long, track the highest closing price (or intraday high).
+#   - Sell at the next bar's open after a close at least normalStopPercent below
+#     that high.
+#   - When the reference index is below its 75-day SMA, disable new entries and
+#     tighten the trailing stop to defensiveStopPercent.
+#
+# Apply this strategy to a DAILY chart. Signals are evaluated at the close and
+# orders are filled at the following session's open.
+
+declare upper;
+declare hide_on_intraday;
+
+input entryPercent = 20.0;
+input normalStopPercent = 20.0;
+input defensiveStopPercent = 10.0;
+
+input useIndexFilter = yes;
+input indexSymbol = "SPX";
+input indexAverageLength = 75;
+
+input useIntradayExtremes = no;
+input tradeSize = 1;
+input initialCapital = 100000.0;
+input useAutomaticPointValue = yes;
+input dollarsPerPointOverride = 1.0;
+input slippageTicksPerSide = 0.0;
+input commissionPerContractPerSide = 0.0;
+
+input showLevels = yes;
+input showSignals = yes;
+input showStateLabels = yes;
+input showEntryDiagnostics = yes;
+input showPerformanceLabels = yes;
+
+Assert(entryPercent > 0,
+       "entryPercent must be greater than zero");
+Assert(normalStopPercent > 0 and normalStopPercent < 100,
+       "normalStopPercent must be between zero and 100");
+Assert(defensiveStopPercent > 0 and defensiveStopPercent < 100,
+       "defensiveStopPercent must be between zero and 100");
+Assert(defensiveStopPercent <= normalStopPercent,
+       "defensiveStopPercent cannot exceed normalStopPercent");
+Assert(indexAverageLength > 0,
+       "indexAverageLength must be greater than zero");
+Assert(tradeSize > 0,
+       "tradeSize must be greater than zero");
+Assert(initialCapital > 0,
+       "initialCapital must be greater than zero");
+Assert(dollarsPerPointOverride > 0,
+       "dollarsPerPointOverride must be greater than zero");
+Assert(slippageTicksPerSide >= 0,
+       "slippageTicksPerSide cannot be negative");
+Assert(commissionPerContractPerSide >= 0,
+       "commissionPerContractPerSide cannot be negative");
+
+def isDaily = GetAggregationPeriod() == AggregationPeriod.DAY;
+def validChartBar = !IsNaN(open) and !IsNaN(close);
+
+def entryMultiplier = 1 + entryPercent / 100;
+def normalStopMultiplier = 1 - normalStopPercent / 100;
+def defensiveStopMultiplier = 1 - defensiveStopPercent / 100;
+
+# The strategy is restricted to a daily chart, so the reference symbol inherits
+# that daily aggregation. Avoiding a redundant secondary aggregation also makes
+# index data more reliable in strategies on thinkorswim.
+def indexClose = close(symbol = indexSymbol);
+def indexAverage = Average(indexClose, indexAverageLength);
+def indexFilterAvailable =
+    !IsNaN(indexClose) and !IsNaN(indexAverage);
+def defensiveMarket =
+    useIndexFilter and
+    indexFilterAvailable and
+    indexClose < indexAverage;
+def marketPermitsEntries =
+    !useIndexFilter or
+    (indexFilterAvailable and indexClose >= indexAverage);
+def activeStopPercent =
+    if defensiveMarket
+    then defensiveStopPercent
+    else normalStopPercent;
+def stopMultiplier =
+    if defensiveMarket
+    then defensiveStopMultiplier
+    else normalStopMultiplier;
+
+def lowSource =
+    if useIntradayExtremes then low else close;
+def highSource =
+    if useIntradayExtremes then high else close;
+
+# Explicit state models the next-session-open fills used by AddOrder. This also
+# avoids depending on GetAveragePrice(), whose value is strategy-wide rather
+# than a reliable same-bar state machine input.
+def position;
+def referenceLow;
+def referenceHigh;
+def entrySignal;
+def exitSignal;
+
+def entryFill =
+    entrySignal[1] and
+    position[1] == 0 and
+    validChartBar;
+def exitFill =
+    exitSignal[1] and
+    position[1] == 1 and
+    validChartBar;
+
+position = CompoundValue(
+    1,
+    if exitFill then 0
+    else if entryFill then 1
+    else position[1],
+    0
+);
+
+# The exit-fill session starts a fresh flat cycle and participates in the new
+# low calculation. While an entry order awaits its next-open fill, the low can
+# still move lower; the already-generated order is intentionally not canceled.
+referenceLow = CompoundValue(
+    1,
+    if position == 0 then
+        if position[1] == 1 or IsNaN(referenceLow[1])
+        then lowSource
+        else Min(referenceLow[1], lowSource)
+    else referenceLow[1],
+    lowSource
+);
+
+def entryLevel = referenceLow * entryMultiplier;
+
+# If the index filter blocked the original threshold crossing, an entry becomes
+# eligible once the filter permits entries again while price remains above the
+# threshold.
+entrySignal =
+    isDaily and
+    validChartBar and
+    position == 0 and
+    marketPermitsEntries and
+    !IsNaN(entryLevel) and
+    close >= entryLevel;
+
+# Begin the trailing high with the entry-fill session, then ratchet it upward
+# until the exit order fills.
+referenceHigh = CompoundValue(
+    1,
+    if position == 1 then
+        if position[1] == 0 or IsNaN(referenceHigh[1])
+        then highSource
+        else Max(referenceHigh[1], highSource)
+    else highSource,
+    highSource
+);
+
+def exitLevel = referenceHigh * stopMultiplier;
+
+# No crossover test is used here: when the index falls below its SMA, the stop
+# can jump from 20% to 10% and must be allowed to trigger on that same close.
+exitSignal =
+    isDaily and
+    validChartBar and
+    position == 1 and
+    !IsNaN(exitLevel) and
+    close <= exitLevel;
+
+AddOrder(
+    OrderType.BUY_TO_OPEN,
+    entrySignal,
+    open[-1],
+    tradeSize,
+    CreateColor(0, 197, 49),
+    CreateColor(0, 197, 49),
+    "20% Flipper buy"
+);
+
+AddOrder(
+    OrderType.SELL_TO_CLOSE,
+    exitSignal,
+    open[-1],
+    tradeSize,
+    CreateColor(255, 95, 95),
+    CreateColor(255, 95, 95),
+    "Flipper trailing exit"
+);
+
+plot EntryThreshold =
+    if showLevels and position == 0
+    then entryLevel
+    else Double.NaN;
+EntryThreshold.SetDefaultColor(CreateColor(0, 197, 49));
+EntryThreshold.SetStyle(Curve.SHORT_DASH);
+EntryThreshold.SetLineWeight(2);
+EntryThreshold.HideBubble();
+
+plot TrailingStop =
+    if showLevels and position == 1
+    then exitLevel
+    else Double.NaN;
+TrailingStop.SetDefaultColor(CreateColor(255, 95, 95));
+TrailingStop.SetStyle(Curve.SHORT_DASH);
+TrailingStop.SetLineWeight(2);
+TrailingStop.HideBubble();
+
+plot BuySignal =
+    if showSignals and entrySignal
+    then low - 2 * TickSize()
+    else Double.NaN;
+BuySignal.SetPaintingStrategy(PaintingStrategy.ARROW_UP);
+BuySignal.SetDefaultColor(CreateColor(0, 197, 49));
+BuySignal.SetLineWeight(3);
+BuySignal.HideBubble();
+BuySignal.HideTitle();
+
+plot ExitArrow =
+    if showSignals and exitSignal
+    then high + 2 * TickSize()
+    else Double.NaN;
+ExitArrow.SetPaintingStrategy(PaintingStrategy.ARROW_DOWN);
+ExitArrow.SetDefaultColor(CreateColor(255, 95, 95));
+ExitArrow.SetLineWeight(3);
+ExitArrow.HideBubble();
+ExitArrow.HideTitle();
+
+# Dollar-normalized performance statistics. Entry and exit events occur on the
+# session after each signal, matching the next-open prices supplied to AddOrder.
+def symbolTickSize = TickSize();
+def symbolTickValue = TickValue();
+def automaticPointValue =
+    if symbolTickSize > 0 and symbolTickValue > 0
+    then symbolTickValue / symbolTickSize
+    else dollarsPerPointOverride;
+def dollarsPerPoint =
+    if useAutomaticPointValue
+    then automaticPointValue
+    else dollarsPerPointOverride;
+def slippagePerSide = slippageTicksPerSide * symbolTickSize;
+
+def modeledEntryPrice = CompoundValue(
+    1,
+    if entryFill
+    then open + slippagePerSide
+    else modeledEntryPrice[1],
+    0
+);
+def modeledExitPrice = open - slippagePerSide;
+def roundTripCommission =
+    2 * commissionPerContractPerSide * tradeSize;
+def closedTradePL =
+    if exitFill
+    then (modeledExitPrice - modeledEntryPrice[1]) *
+         dollarsPerPoint * tradeSize - roundTripCommission
+    else 0;
+
+def totalTrades = CompoundValue(
+    1,
+    totalTrades[1] + (if exitFill then 1 else 0),
+    0
+);
+def winningTrades = CompoundValue(
+    1,
+    winningTrades[1] +
+        (if exitFill and closedTradePL > 0 then 1 else 0),
+    0
+);
+def losingTrades = CompoundValue(
+    1,
+    losingTrades[1] +
+        (if exitFill and closedTradePL < 0 then 1 else 0),
+    0
+);
+def grossWins = CompoundValue(
+    1,
+    grossWins[1] +
+        (if exitFill and closedTradePL > 0 then closedTradePL else 0),
+    0
+);
+def grossLosses = CompoundValue(
+    1,
+    grossLosses[1] +
+        (if exitFill and closedTradePL < 0 then closedTradePL else 0),
+    0
+);
+def realizedPL = CompoundValue(
+    1,
+    realizedPL[1] + closedTradePL,
+    0
+);
+
+# Charge the entry-side commission against an open trade. The exit-side
+# commission is included once the round trip closes.
+def openPL =
+    if position == 1
+    then (close - modeledEntryPrice) * dollarsPerPoint * tradeSize -
+         commissionPerContractPerSide * tradeSize
+    else 0;
+def cumulativePL = realizedPL + openPL;
+def equity = initialCapital + cumulativePL;
+def equityPeak = CompoundValue(
+    1,
+    Max(equityPeak[1], equity),
+    initialCapital
+);
+def currentDrawdown = Max(0, equityPeak - equity);
+def currentDrawdownPercent =
+    if equityPeak > 0 then 100 * currentDrawdown / equityPeak else 0;
+def maxDrawdown = CompoundValue(
+    1,
+    Max(maxDrawdown[1], currentDrawdown),
+    0
+);
+def maxDrawdownPercent = CompoundValue(
+    1,
+    Max(maxDrawdownPercent[1], currentDrawdownPercent),
+    0
+);
+
+def winRate =
+    if totalTrades > 0 then 100 * winningTrades / totalTrades else 0;
+def averageTrade =
+    if totalTrades > 0 then realizedPL / totalTrades else 0;
+def profitFactor =
+    if grossLosses < 0
+    then grossWins / AbsValue(grossLosses)
+    else 0;
+def totalReturnPercent =
+    100 * cumulativePL / initialCapital;
+
+AddLabel(
+    showStateLabels,
+    if !isDaily then "20% FLIPPER: USE A DAILY CHART"
+    else if !useIndexFilter then "INDEX FILTER: OFF"
+    else if !indexFilterAvailable then "INDEX FILTER: WARMING UP"
+    else if marketPermitsEntries then "INDEX FILTER: ENTRIES ENABLED"
+    else "INDEX FILTER: ENTRIES DISABLED",
+    if !isDaily or !indexFilterAvailable and useIndexFilter
+    then Color.YELLOW
+    else if marketPermitsEntries
+    then CreateColor(0, 197, 49)
+    else CreateColor(255, 95, 95)
+);
+
+AddLabel(
+    showStateLabels and position == 1,
+    "TRAILING STOP: " + AsText(activeStopPercent) + "%",
+    if defensiveMarket then Color.YELLOW else Color.LIGHT_GRAY
+);
+
+# This label exposes the exact gate preventing a new entry. It is especially
+# useful when a reference ticker is unsupported or the 75-bar SMA has not yet
+# accumulated enough daily history.
+AddLabel(
+    showEntryDiagnostics and position == 0,
+    if !isDaily then "ENTRY BLOCKED: CHART IS NOT DAILY"
+    else if useIndexFilter and !indexFilterAvailable
+    then "ENTRY BLOCKED: NO " + indexSymbol + " / SMA DATA"
+    else if !marketPermitsEntries
+    then "ENTRY BLOCKED: " + indexSymbol + " BELOW SMA"
+    else if IsNaN(referenceLow) or IsNaN(entryLevel)
+    then "ENTRY BLOCKED: PRICE DATA UNAVAILABLE"
+    else if entrySignal then "ENTRY SIGNAL: NEXT OPEN"
+    else "WAITING: LOW " + AsPrice(referenceLow) +
+         " | TRIGGER " + AsPrice(entryLevel) +
+         " | CLOSE " + AsPrice(close),
+    if entrySignal then CreateColor(0, 197, 49)
+    else if !isDaily or useIndexFilter and !indexFilterAvailable
+    then Color.YELLOW
+    else if !marketPermitsEntries
+    then CreateColor(255, 95, 95)
+    else Color.LIGHT_GRAY
+);
+
+AddLabel(
+    showPerformanceLabels,
+    "Model: next open | Point value: $" + Round(dollarsPerPoint, 2),
+    Color.LIGHT_GRAY
+);
+AddLabel(
+    showPerformanceLabels,
+    "Trades: " + totalTrades +
+    " | W: " + winningTrades +
+    " | L: " + losingTrades,
+    Color.LIGHT_GRAY
+);
+AddLabel(
+    showPerformanceLabels,
+    "Realized P/L: $" + Round(realizedPL, 2),
+    if realizedPL > 0 then CreateColor(0, 197, 49)
+    else if realizedPL < 0 then CreateColor(255, 95, 95)
+    else Color.GRAY
+);
+AddLabel(
+    showPerformanceLabels and position == 1,
+    "Open P/L: $" + Round(openPL, 2),
+    if openPL > 0 then CreateColor(0, 197, 49)
+    else if openPL < 0 then CreateColor(255, 95, 95)
+    else Color.GRAY
+);
+AddLabel(
+    showPerformanceLabels,
+    "Total P/L: $" + Round(cumulativePL, 2) +
+    " (" + Round(totalReturnPercent, 2) + "%)",
+    if cumulativePL > 0 then CreateColor(0, 197, 49)
+    else if cumulativePL < 0 then CreateColor(255, 95, 95)
+    else Color.GRAY
+);
+AddLabel(
+    showPerformanceLabels,
+    "Win rate: " + Round(winRate, 1) + "%" +
+    " | Avg: $" + Round(averageTrade, 2),
+    Color.LIGHT_GRAY
+);
+AddLabel(
+    showPerformanceLabels,
+    "Profit factor: " + Round(profitFactor, 2),
+    Color.LIGHT_GRAY
+);
+AddLabel(
+    showPerformanceLabels,
+    "Max DD: $" + Round(maxDrawdown, 2) +
+    " (" + Round(maxDrawdownPercent, 2) + "%)",
+    CreateColor(255, 95, 95)
+);

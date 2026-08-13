@@ -1,0 +1,165 @@
+# TechTrader Strategy
+#
+# Objective entry rules:
+#   1. Close above the 40-day simple moving average.
+#   2. Close below $10.00.
+#   3. Bullish trigger bar (close above open).
+#   4. 21-day average dollar turnover above $500,000.
+#   5. Trigger bar is at the 70-day high.
+#   6. Trigger bar trades above the prior 10-day high.
+#
+# Exit rules:
+#   - Initial protective stop 10% below the entry fill.
+#   - Trailing stop at the 180-day exponential moving average of the lows.
+#   - The active stop is the higher of those two values, so it can never move
+#     below the initial protective stop.
+#
+# The subjective trend and trading-range rules require manual chart review and
+# are deliberately not approximated here. Apply this strategy to a DAILY chart.
+
+declare upper;
+declare hide_on_intraday;
+
+input trendLength = 40;
+input maximumPrice = 10.00;
+input turnoverLength = 21;
+input minimumAverageTurnover = 500000.0;
+input breakoutLength = 10;
+input newHighLength = 70;
+
+input initialStopPercent = 10.0;
+input trailingStopLength = 180;
+input tradeSize = 1;
+input useIntradayStopTouch = yes;
+
+input showTrendAverage = yes;
+input showTrailingStop = yes;
+input showSignals = yes;
+input showManualReviewLabel = yes;
+
+Assert(trendLength > 0, "trendLength must be greater than zero");
+Assert(maximumPrice > 0, "maximumPrice must be greater than zero");
+Assert(turnoverLength > 0, "turnoverLength must be greater than zero");
+Assert(minimumAverageTurnover >= 0,
+       "minimumAverageTurnover cannot be negative");
+Assert(breakoutLength > 0, "breakoutLength must be greater than zero");
+Assert(newHighLength > 0, "newHighLength must be greater than zero");
+Assert(initialStopPercent > 0 and initialStopPercent < 100,
+       "initialStopPercent must be between zero and 100");
+Assert(trailingStopLength > 0,
+       "trailingStopLength must be greater than zero");
+Assert(tradeSize > 0, "tradeSize must be greater than zero");
+
+def isDaily = GetAggregationPeriod() == AggregationPeriod.DAY;
+
+# Objective entry filters.
+def trendSMA = Average(close, trendLength);
+def averageDollarTurnover = Average(close * volume, turnoverLength);
+def priorBreakoutHigh = Highest(high[1], breakoutLength);
+
+# Including the current bar makes this read as: the trigger bar is tied for or
+# above every high in the most recent newHighLength sessions.
+def isNewHigh = high >= Highest(high, newHighLength);
+def breaksPriorHigh = high > priorBreakoutHigh;
+
+# Require enough prior bars for every entry lookback. ExpAverage initializes
+# recursively, so the 180-day trailing average does not need to delay entries.
+def requiredEntryBars = Max(
+    Max(trendLength, turnoverLength),
+    Max(newHighLength, breakoutLength + 1)
+);
+def enoughHistory = BarNumber() >= requiredEntryBars;
+
+def entrySignal =
+    isDaily and
+    enoughHistory and
+    close > trendSMA and
+    close < maximumPrice and
+    close > open and
+    averageDollarTurnover > minimumAverageTurnover and
+    isNewHigh and
+    breaksPriorHigh;
+
+# EntryPrice() reflects the strategy's actual fill price. With open[-1] below,
+# Thinkorswim evaluates the setup at today's close and enters at the next open.
+def strategyEntryPrice = EntryPrice();
+def inPosition = strategyEntryPrice > 0;
+def initialStop =
+    strategyEntryPrice * (1 - initialStopPercent / 100);
+def trailingEMA = ExpAverage(low, trailingStopLength);
+def activeStop =
+    if inPosition
+    then Max(initialStop, trailingEMA)
+    else Double.NaN;
+
+def stopTriggered =
+    inPosition and
+    (if useIntradayStopTouch
+     then low <= activeStop
+     else close crosses below activeStop);
+
+# For an intraday stop touch, assume a fill at the stop unless the bar opened
+# below it; a gap through the stop is filled at that bar's open instead.
+def modeledStopFill =
+    if open < activeStop
+    then open
+    else activeStop;
+
+AddOrder(
+    OrderType.BUY_TO_OPEN,
+    entrySignal and !inPosition,
+    open[-1],
+    tradeSize,
+    CreateColor(0, 197, 49),
+    CreateColor(0, 197, 49),
+    "TechTrader entry"
+);
+
+AddOrder(
+    OrderType.SELL_TO_CLOSE,
+    stopTriggered,
+    modeledStopFill,
+    tradeSize,
+    CreateColor(255, 95, 95),
+    CreateColor(255, 95, 95),
+    "TechTrader stop"
+);
+
+plot TrendAverage =
+    if showTrendAverage then trendSMA else Double.NaN;
+TrendAverage.SetDefaultColor(CreateColor(255, 255, 0));
+TrendAverage.SetLineWeight(2);
+TrendAverage.HideBubble();
+
+plot TrailingStop =
+    if showTrailingStop and inPosition then activeStop else Double.NaN;
+TrailingStop.SetDefaultColor(CreateColor(255, 95, 95));
+TrailingStop.SetLineWeight(2);
+TrailingStop.SetStyle(Curve.SHORT_DASH);
+TrailingStop.HideBubble();
+
+plot EntryMarker =
+    if showSignals and entrySignal and !inPosition
+    then low - 2 * TickSize()
+    else Double.NaN;
+EntryMarker.SetPaintingStrategy(PaintingStrategy.ARROW_UP);
+EntryMarker.SetDefaultColor(CreateColor(0, 197, 49));
+EntryMarker.SetLineWeight(3);
+EntryMarker.HideBubble();
+EntryMarker.HideTitle();
+
+plot ExitMarker =
+    if showSignals and stopTriggered
+    then high + 2 * TickSize()
+    else Double.NaN;
+ExitMarker.SetPaintingStrategy(PaintingStrategy.ARROW_DOWN);
+ExitMarker.SetDefaultColor(CreateColor(255, 95, 95));
+ExitMarker.SetLineWeight(3);
+ExitMarker.HideBubble();
+ExitMarker.HideTitle();
+
+AddLabel(
+    showManualReviewLabel,
+    "Manual review: obvious uptrend/downtrend breakout; not range-bound",
+    CreateColor(211, 211, 211)
+);
