@@ -1,0 +1,85 @@
+# Rolling Hurst Regime Proxy
+#
+# Estimates the scaling exponent of log-price changes over 1, 2, 4, 8,
+# and 16 bars. For a process whose root-mean-square displacement scales as
+# lag^H, the slope of log(RMS displacement) versus log(lag) is H.
+#
+# This is a descriptive regime feature, not a trading signal. H > 0.5 does
+# not identify trend direction, and finite-window estimates are noisy.
+
+declare lower;
+
+input length = 60;
+input smoothingLength = 5;
+input trendingThreshold = 0.60;
+input revertingThreshold = 0.40;
+input showRawEstimate = no;
+input useCompletedBars = yes;
+
+def price = if useCompletedBars then close[1] else close;
+def r1 = Log(price / price[1]);
+def r2 = Log(price / price[2]);
+def r4 = Log(price / price[4]);
+def r8 = Log(price / price[8]);
+def r16 = Log(price / price[16]);
+
+def s1 = Sqrt(Average(r1 * r1, length));
+def s2 = Sqrt(Average(r2 * r2, length));
+def s4 = Sqrt(Average(r4 * r4, length));
+def s8 = Sqrt(Average(r8 * r8, length));
+def s16 = Sqrt(Average(r16 * r16, length));
+
+def valid = s1 > 0 and s2 > 0 and s4 > 0 and s8 > 0 and s16 > 0;
+
+# With log-lags 0, ln(2), 2ln(2), 3ln(2), and 4ln(2), the OLS slope
+# simplifies to the weighted expression below. The zero-weight s4 term
+# is retained in "valid" because it is one of the fitted observations.
+def rawH = if valid then
+    (-2 * Log(s1) - Log(s2) + Log(s8) + 2 * Log(s16)) /
+    (10 * Log(2))
+    else Double.NaN;
+
+plot Hurst = ExpAverage(rawH, smoothingLength);
+Hurst.SetLineWeight(2);
+Hurst.AssignValueColor(
+    if Hurst > trendingThreshold then Color.GREEN
+    else if Hurst < revertingThreshold then Color.RED
+    else Color.YELLOW
+);
+
+plot RawEstimate = if showRawEstimate then rawH else Double.NaN;
+RawEstimate.SetDefaultColor(Color.GRAY);
+RawEstimate.SetStyle(Curve.SHORT_DASH);
+
+plot TheoreticalRandomWalk = 0.50;
+TheoreticalRandomWalk.SetDefaultColor(Color.GRAY);
+TheoreticalRandomWalk.SetStyle(Curve.LONG_DASH);
+
+plot TrendingBand = trendingThreshold;
+TrendingBand.SetDefaultColor(Color.DARK_GREEN);
+TrendingBand.SetStyle(Curve.SHORT_DASH);
+
+plot RevertingBand = revertingThreshold;
+RevertingBand.SetDefaultColor(Color.DARK_RED);
+RevertingBand.SetStyle(Curve.SHORT_DASH);
+
+AddCloud(TrendingBand, RevertingBand, Color.DARK_GRAY, Color.DARK_GRAY);
+
+AddLabel(
+    yes,
+    if IsNaN(Hurst) then "HURST: WARMING UP"
+    else if Hurst > trendingThreshold then "H " + Round(Hurst, 2) + " PERSISTENT"
+    else if Hurst < revertingThreshold then "H " + Round(Hurst, 2) + " ANTI-PERSISTENT"
+    else "H " + Round(Hurst, 2) + " INCONCLUSIVE",
+    if IsNaN(Hurst) then Color.GRAY
+    else if Hurst > trendingThreshold then Color.GREEN
+    else if Hurst < revertingThreshold then Color.RED
+    else Color.YELLOW
+);
+
+AddLabel(
+    yes,
+    "WINDOW " + length + " | SMOOTH " + smoothingLength +
+    (if useCompletedBars then " | CLOSED BARS" else " | LIVE BAR"),
+    Color.GRAY
+);
