@@ -79,8 +79,8 @@ def downWaveVolume = CompoundValue(1,
 plot upVol = upWaveVolume;
 plot downVol = downWaveVolume;
 
-upVol.SetDefaultColor(Color.DARK_GREEN);
-downVol.SetDefaultColor(Color.DOWNTICK);
+upVol.SetDefaultColor(CreateColor(0, 197, 49));
+downVol.SetDefaultColor(CreateColor(255, 95, 95));
 upVol.SetPaintingStrategy(PaintingStrategy.HISTOGRAM);
 downVol.SetPaintingStrategy(PaintingStrategy.HISTOGRAM);
 upVol.SetLineWeight(5);
@@ -88,8 +88,8 @@ downVol.SetLineWeight(5);
 
 AssignPriceColor(
     if !paintBars then Color.CURRENT
-    else if waveDirection == 1 then Color.DARK_GREEN
-    else if waveDirection == -1 then Color.DOWNTICK
+    else if waveDirection == 1 then CreateColor(0, 197, 49)
+    else if waveDirection == -1 then CreateColor(255, 95, 95)
     else Color.CURRENT
 );
 AddLabel(
