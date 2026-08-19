@@ -71,8 +71,8 @@ plot wave = if !useDashedWaveLine then zigZagValue else Double.NaN;
 wave.EnableApproximation();
 wave.AssignValueColor(
     if waveDirection[1] == 1
-        then if usePurplePinkWaveColors then Color.VIOLET else Color.GREEN
-    else if usePurplePinkWaveColors then Color.PINK else Color.RED
+        then if usePurplePinkWaveColors then Color.VIOLET else CreateColor(0, 197, 49)
+    else if usePurplePinkWaveColors then Color.PINK else CreateColor(255, 95, 95)
 );
 wave.SetLineWeight(waveLineWeight);
 
@@ -80,16 +80,16 @@ plot dashedWave = if useDashedWaveLine then zigZagValue else Double.NaN;
 dashedWave.EnableApproximation();
 dashedWave.AssignValueColor(
     if waveDirection[1] == 1
-        then if usePurplePinkWaveColors then Color.VIOLET else Color.GREEN
-    else if usePurplePinkWaveColors then Color.PINK else Color.RED
+        then if usePurplePinkWaveColors then Color.VIOLET else CreateColor(0, 197, 49)
+    else if usePurplePinkWaveColors then Color.PINK else CreateColor(255, 95, 95)
 );
 dashedWave.SetStyle(Curve.SHORT_DASH);
 dashedWave.SetLineWeight(waveLineWeight);
 
 AssignPriceColor(
     if !paintBars then Color.CURRENT
-    else if waveDirection == 1 then Color.DARK_GREEN
-    else if waveDirection == -1 then Color.DOWNTICK
+    else if waveDirection == 1 then CreateColor(0, 197, 49)
+    else if waveDirection == -1 then CreateColor(255, 95, 95)
     else Color.CURRENT
 );
 AddLabel(
@@ -138,34 +138,34 @@ plot uCount = if displayMode == displayMode.barNumber and barsUp > 0
     then barsUp
     else Double.NaN;
 uCount.SetPaintingStrategy(PaintingStrategy.VALUES_BELOW);
-uCount.SetDefaultColor(Color.DARK_GREEN);
+uCount.SetDefaultColor(CreateColor(0, 197, 49));
 
 plot dCount = if displayMode == displayMode.barNumber and barsDown > 0
     then barsDown
     else Double.NaN;
 dCount.SetPaintingStrategy(PaintingStrategy.VALUES_ABOVE);
-dCount.SetDefaultColor(Color.RED);
+dCount.SetDefaultColor(CreateColor(255, 95, 95));
 
 plot uCountTot = if displayMode == displayMode.barTotal and completedUpWave
     then barsUp[1]
     else Double.NaN;
 uCountTot.SetPaintingStrategy(PaintingStrategy.VALUES_ABOVE);
-uCountTot.SetDefaultColor(Color.DARK_GREEN);
+uCountTot.SetDefaultColor(CreateColor(0, 197, 49));
 
 plot dCountTot = if displayMode == displayMode.barTotal and completedDownWave
     then barsDown[1]
     else Double.NaN;
 dCountTot.SetPaintingStrategy(PaintingStrategy.VALUES_BELOW);
-dCountTot.SetDefaultColor(Color.RED);
+dCountTot.SetDefaultColor(CreateColor(255, 95, 95));
 
 plot uVol = if displayMode == displayMode.volume and completedUpWave
     then upWaveVolume[1]
     else Double.NaN;
 uVol.SetPaintingStrategy(PaintingStrategy.VALUES_ABOVE);
-uVol.SetDefaultColor(Color.DARK_GREEN);
+uVol.SetDefaultColor(CreateColor(0, 197, 49));
 
 plot dVol = if displayMode == displayMode.volume and completedDownWave
     then downWaveVolume[1]
     else Double.NaN;
 dVol.SetPaintingStrategy(PaintingStrategy.VALUES_BELOW);
-dVol.SetDefaultColor(Color.RED);
+dVol.SetDefaultColor(CreateColor(255, 95, 95));

@@ -148,7 +148,7 @@ MCSI.SetLineWeight(2);
 
 MCO.SetPaintingStrategy(PaintingStrategy.HISTOGRAM);
 MCO.SetLineWeight(3);
-MCO.AssignValueColor(if mcoScore >= 0 then Color.GREEN else Color.RED);
+MCO.AssignValueColor(if mcoScore >= 0 then CreateColor(0, 197, 49) else CreateColor(255, 95, 95));
 
 PlusTwo.SetDefaultColor(Color.GRAY);
 PlusTwo.SetStyle(Curve.SHORT_DASH);
@@ -161,32 +161,32 @@ MinusTwo.SetDefaultColor(Color.GRAY);
 MinusTwo.SetStyle(Curve.SHORT_DASH);
 
 CurlUp.SetPaintingStrategy(PaintingStrategy.POINTS);
-CurlUp.SetDefaultColor(Color.GREEN);
+CurlUp.SetDefaultColor(CreateColor(0, 197, 49));
 CurlUp.SetLineWeight(4);
 CurlDown.SetPaintingStrategy(PaintingStrategy.POINTS);
 CurlDown.SetDefaultColor(Color.YELLOW);
 CurlDown.SetLineWeight(4);
 
 MAReclaim.SetPaintingStrategy(PaintingStrategy.ARROW_UP);
-MAReclaim.SetDefaultColor(Color.GREEN);
+MAReclaim.SetDefaultColor(CreateColor(0, 197, 49));
 MAReclaim.SetLineWeight(3);
 MALoss.SetPaintingStrategy(PaintingStrategy.ARROW_DOWN);
-MALoss.SetDefaultColor(Color.RED);
+MALoss.SetDefaultColor(CreateColor(255, 95, 95));
 MALoss.SetLineWeight(3);
 
 AddLabel(showLabels,
     "MCO: " + Round(mcoScore, 2) + " sigma",
-    if mcoScore <= -washoutLevel then Color.RED
+    if mcoScore <= -washoutLevel then CreateColor(255, 95, 95)
     else if mcoScore <= -alertLevel then Color.YELLOW
-    else if mcoScore > 0 then Color.GREEN
+    else if mcoScore > 0 then CreateColor(0, 197, 49)
     else Color.GRAY);
 AddLabel(showLabels,
     "MCSI vs " + mcsiAverageLength + "dma: " + Round(mcsiScore, 2) + " sigma",
     if mcsiScore > 0 then Color.CYAN else Color.GRAY);
-AddLabel(showLabels and mcsiCurlUp, "MCSI CURL UP", Color.GREEN);
+AddLabel(showLabels and mcsiCurlUp, "MCSI CURL UP", CreateColor(0, 197, 49));
 AddLabel(showLabels and mcsiCurlDown, "MCSI CURL DOWN", Color.YELLOW);
-AddLabel(showLabels and mcsiReclaim, "MCSI MA RECLAIM", Color.GREEN);
-AddLabel(showLabels and mcsiLoss, "MCSI MA LOSS", Color.RED);
+AddLabel(showLabels and mcsiReclaim, "MCSI MA RECLAIM", CreateColor(0, 197, 49));
+AddLabel(showLabels and mcsiLoss, "MCSI MA LOSS", CreateColor(255, 95, 95));
 AddLabel(showLabels and !isDailyChart,
     "Warning: use daily aggregation",
     Color.YELLOW);
