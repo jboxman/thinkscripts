@@ -1,0 +1,66 @@
+# SessionOpenCloseMarkers for ES (intraday)
+# Draws vertical lines at Asia, Europe, US opens, and US closes.
+# Shades Asia/Europe and Europe/US session overlaps.
+
+input showAsia = yes;
+input showEurope = yes;
+input showUSOpen = yes;
+input showUSRTHClose = yes;     # ES RTH close (16:15 ET)
+input showUSCashClose = no;     # Cash equity close (16:00 ET)
+input showSessionOverlaps = yes;
+
+# Times in HHmm, interpreted in Eastern Standard Time by thinkScript
+input asiaOpen = 2000;          # 20:00
+input asiaClose = 0400;         # 04:00
+input europeOpen = 0300;        # 03:00
+input europeClose = 1200;       # 12:00
+input usOpen = 0930;            # 09:30
+input usRTHClose = 1615;        # 16:15 (CME ES RTH close)
+input usCashClose = 1600;       # 16:00 (NYSE cash close)
+
+input showBubbles = yes;
+input weekdaysOnly = yes;       # Hide markers on Sat/Sun
+
+def yyyymmdd = GetYYYYMMDD();
+def dow = GetDayOfWeek(yyyymmdd);   # 1=Mon ... 7=Sun
+def isWeekday = dow >= 1 and dow <= 5;
+def dayFilter = if weekdaysOnly then isWeekday else yes;
+
+def atAsia = secondsFromTime(asiaOpen) == 0;
+def atEurope = secondsFromTime(europeOpen) == 0;
+def atUSOpen = secondsFromTime(usOpen) == 0;
+def atUSRTHClose = secondsFromTime(usRTHClose) == 0;
+def atUSCashClose = secondsFromTime(usCashClose) == 0;
+
+def inAsia = if asiaOpen < asiaClose
+    then secondsFromTime(asiaOpen) >= 0 and secondsTillTime(asiaClose) > 0
+    else secondsFromTime(asiaOpen) >= 0 or secondsTillTime(asiaClose) > 0;
+def inEurope = secondsFromTime(europeOpen) >= 0 and secondsTillTime(europeClose) > 0;
+def inUS = secondsFromTime(usOpen) >= 0 and secondsTillTime(usRTHClose) > 0;
+
+def asiaEuropeOverlap = dayFilter and showAsia and showEurope and inAsia and inEurope;
+def europeUSOverlap = dayFilter and showEurope and showUSOpen and inEurope and inUS;
+
+def asiaEuropeTop = if showSessionOverlaps and asiaEuropeOverlap then Double.POSITIVE_INFINITY else Double.NaN;
+def asiaEuropeBottom = if showSessionOverlaps and asiaEuropeOverlap then Double.NEGATIVE_INFINITY else Double.NaN;
+def europeUSTop = if showSessionOverlaps and europeUSOverlap then Double.POSITIVE_INFINITY else Double.NaN;
+def europeUSBottom = if showSessionOverlaps and europeUSOverlap then Double.NEGATIVE_INFINITY else Double.NaN;
+
+AddCloud(asiaEuropeTop, asiaEuropeBottom, Color.CYAN, Color.CYAN);
+AddCloud(europeUSTop, europeUSBottom, Color.YELLOW, Color.YELLOW);
+
+AddVerticalLine(dayFilter and showAsia and atAsia, "Asia", Color.CYAN);
+AddVerticalLine(dayFilter and showEurope and atEurope,
+    if showSessionOverlaps and asiaEuropeOverlap then "Europe / Asia overlap" else "Europe",
+    Color.YELLOW);
+AddVerticalLine(dayFilter and showUSOpen and atUSOpen,
+    if showSessionOverlaps and europeUSOverlap then "US Open / Europe overlap" else "US Open",
+    Color.LIGHT_GREEN);
+AddVerticalLine(dayFilter and showUSRTHClose and atUSRTHClose, "US RTH Close", Color.LIGHT_RED);
+AddVerticalLine(dayFilter and showUSCashClose and atUSCashClose, "US Cash Close", Color.RED);
+
+AddChartBubble(showBubbles and dayFilter and showAsia and atAsia, low, "Asia", Color.CYAN, no);
+AddChartBubble(showBubbles and dayFilter and showEurope and atEurope, low, "EU", Color.YELLOW, no);
+AddChartBubble(showBubbles and dayFilter and showUSOpen and atUSOpen, low, "US Open", Color.LIGHT_GREEN, no);
+AddChartBubble(showBubbles and dayFilter and showUSRTHClose and atUSRTHClose, low, "RTH Close", Color.LIGHT_RED, yes);
+AddChartBubble(showBubbles and dayFilter and showUSCashClose and atUSCashClose, low, "Cash Close", Color.RED, yes);
