@@ -1,0 +1,134 @@
+# SPX Drawdown Frequency
+#
+# Daily-chart study with two separate measurements:
+#   - Circles mark close-to-close declines of at least minorDownDayPercent.
+#   - Arrows mark closing-price swings of at least majorCorrectionPercent.
+#
+# A major peak is confirmed only after SPX declines by the configured amount.
+# Its valley is confirmed only after SPX rebounds by that amount. ZigZag moves
+# the newest marker as the swing extends, so recent arrows repaint by design.
+# Counts cover only loaded, closed daily bars.
+
+declare upper;
+declare hide_on_intraday;
+
+input referenceSymbol = "SPX";
+input minorDownDayPercent = 1.0;
+input majorCorrectionPercent = 5.0;
+input showMinorDeclineCircles = yes;
+input showMajorSwingArrows = yes;
+input showCountLabels = yes;
+input onlyClosedBars = yes;
+
+Assert(minorDownDayPercent > 0 and minorDownDayPercent < 100,
+       "minorDownDayPercent must be greater than zero and less than 100");
+Assert(majorCorrectionPercent > minorDownDayPercent and
+       majorCorrectionPercent < 100,
+       "majorCorrectionPercent must exceed minorDownDayPercent and be less than 100");
+
+DefineGlobalColor("MinorDecline", CreateColor(255, 190, 70));
+DefineGlobalColor("MajorPeak", CreateColor(255, 95, 95));
+DefineGlobalColor("MajorValley", CreateColor(0, 197, 49));
+
+def isDaily = GetAggregationPeriod() == AggregationPeriod.DAY;
+def spxClose = close(symbol = referenceSymbol);
+def validReferenceBar = !IsNaN(spxClose);
+def closedBarOK = !onlyClosedBars or !IsNaN(spxClose[-1]);
+def eligibleBar = isDaily and validReferenceBar and closedBarOK;
+
+def dailyChangePercent =
+    if eligibleBar and !IsNaN(spxClose[1]) and spxClose[1] > 0
+    then 100 * (spxClose / spxClose[1] - 1)
+    else Double.NaN;
+def minorDeclineEvent = dailyChangePercent <= -minorDownDayPercent;
+
+# Passing the close as both inputs makes correction depth close-to-close.
+# percentage reversal uses a decimal fraction: 5% = 0.05.
+def majorSwingHigh = ZigZagHighLow(
+    "price h" = spxClose,
+    "price l" = spxClose,
+    "percentage reversal" = majorCorrectionPercent / 100,
+    "absolute reversal" = 0,
+    "atr length" = 5,
+    "atr reversal" = 0
+).lastH;
+
+def majorSwingLow = ZigZagHighLow(
+    "price h" = spxClose,
+    "price l" = spxClose,
+    "percentage reversal" = majorCorrectionPercent / 100,
+    "absolute reversal" = 0,
+    "atr length" = 5,
+    "atr reversal" = 0
+).lastL;
+
+def majorPeakEvent = eligibleBar and !IsNaN(majorSwingHigh);
+def majorValleyEvent = eligibleBar and !IsNaN(majorSwingLow);
+
+plot MinorDeclineCircle =
+    if showMinorDeclineCircles and minorDeclineEvent
+    then high + Max(2 * TickSize(), (high - low) * 0.08)
+    else Double.NaN;
+MinorDeclineCircle.SetPaintingStrategy(PaintingStrategy.POINTS);
+MinorDeclineCircle.SetDefaultColor(GlobalColor("MinorDecline"));
+MinorDeclineCircle.SetLineWeight(3);
+MinorDeclineCircle.HideBubble();
+MinorDeclineCircle.HideTitle();
+
+plot MajorPeakArrow = showMajorSwingArrows and majorPeakEvent;
+MajorPeakArrow.SetPaintingStrategy(PaintingStrategy.BOOLEAN_ARROW_DOWN);
+MajorPeakArrow.SetDefaultColor(GlobalColor("MajorPeak"));
+MajorPeakArrow.SetLineWeight(4);
+MajorPeakArrow.HideBubble();
+MajorPeakArrow.HideTitle();
+
+plot MajorValleyArrow = showMajorSwingArrows and majorValleyEvent;
+MajorValleyArrow.SetPaintingStrategy(PaintingStrategy.BOOLEAN_ARROW_UP);
+MajorValleyArrow.SetDefaultColor(GlobalColor("MajorValley"));
+MajorValleyArrow.SetLineWeight(4);
+MajorValleyArrow.HideBubble();
+MajorValleyArrow.HideTitle();
+
+def loadedSessionCount = TotalSum(if eligibleBar then 1 else 0);
+def minorDeclineCount = TotalSum(if minorDeclineEvent then 1 else 0);
+# Each confirmed peak represents one decline that reached the major threshold.
+def majorCorrectionCount = TotalSum(if majorPeakEvent then 1 else 0);
+def minorDeclineRate =
+    if loadedSessionCount > 0
+    then 100 * minorDeclineCount / loadedSessionCount
+    else 0;
+def sessionsPerMajorCorrection =
+    if majorCorrectionCount > 0
+    then loadedSessionCount / majorCorrectionCount
+    else 0;
+
+AddLabel(
+    showCountLabels and isDaily,
+    referenceSymbol + " " + minorDownDayPercent + "%+ down days: " +
+        minorDeclineCount + " / " + loadedSessionCount + " (" +
+        Round(minorDeclineRate, 1) + "%)",
+    GlobalColor("MinorDecline")
+);
+
+AddLabel(
+    showCountLabels and isDaily,
+    referenceSymbol + " " + majorCorrectionPercent + "%+ corrections: " +
+        majorCorrectionCount +
+        (if majorCorrectionCount > 0
+         then " (~1 per " + Round(sessionsPerMajorCorrection, 0) + " sessions)"
+         else ""),
+    GlobalColor("MajorPeak")
+);
+
+AddLabel(
+    !isDaily,
+    "SPX Drawdown Frequency requires a daily chart",
+    GlobalColor("MajorPeak")
+);
+
+AddLabel(
+    IsNaN(spxClose),
+    "No data for reference symbol " + referenceSymbol,
+    GlobalColor("MajorPeak")
+);
+

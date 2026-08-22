@@ -1,5 +1,8 @@
 ChatGPT derived studies that seem worth keeping.
 
+- `gpt_spx_drawdown_frequency.thinkscript` counts loaded-chart SPX 1% down
+  sessions and repainting, close-based correction swings, with distinct minor
+  circles and major peak/valley arrows.
 - `gpt_hurst_regime.thinkscript` estimates rolling persistence from the
   variance-scaling slope of multi-horizon log returns and classifies only values
   outside a configurable neutral band.
