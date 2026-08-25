@@ -1,46 +1,56 @@
 # SPX Drawdown Frequency
 #
 # Daily-chart study with two separate measurements:
-#   - Circles mark close-to-close declines of at least minorDownDayPercent.
-#   - Arrows mark closing-price swings of at least majorCorrectionPercent.
+#   - Circles mark bearish bars whose high-to-low range is at least
+#     minorDrawdownPercent.
+#   - The label counts closing-price swings of at least majorCorrectionPercent.
 #
-# A major peak is confirmed only after SPX declines by the configured amount.
-# Its valley is confirmed only after SPX rebounds by that amount. ZigZag moves
-# the newest marker as the swing extends, so recent arrows repaint by design.
+# OHLC data does not reveal whether the high occurred before the low. A minor
+# event therefore means range, not known intrabar sequence. ZigZag moves its
+# newest major swing as price extends, so the current count can repaint.
 # Counts cover only loaded, closed daily bars.
 
 declare upper;
 declare hide_on_intraday;
 
 input referenceSymbol = "SPX";
-input minorDownDayPercent = 1.0;
+input minorDrawdownPercent = 1.0;
 input majorCorrectionPercent = 5.0;
 input showMinorDeclineCircles = yes;
-input showMajorSwingArrows = yes;
 input showCountLabels = yes;
 input onlyClosedBars = yes;
 
-Assert(minorDownDayPercent > 0 and minorDownDayPercent < 100,
-       "minorDownDayPercent must be greater than zero and less than 100");
-Assert(majorCorrectionPercent > minorDownDayPercent and
+Assert(minorDrawdownPercent > 0 and minorDrawdownPercent < 100,
+       "minorDrawdownPercent must be greater than zero and less than 100");
+Assert(majorCorrectionPercent > minorDrawdownPercent and
        majorCorrectionPercent < 100,
-       "majorCorrectionPercent must exceed minorDownDayPercent and be less than 100");
+       "majorCorrectionPercent must exceed minorDrawdownPercent and be less than 100");
 
 DefineGlobalColor("MinorDecline", CreateColor(255, 190, 70));
 DefineGlobalColor("MajorPeak", CreateColor(255, 95, 95));
-DefineGlobalColor("MajorValley", CreateColor(0, 197, 49));
 
 def isDaily = GetAggregationPeriod() == AggregationPeriod.DAY;
+def spxOpen = open(symbol = referenceSymbol);
+def spxHigh = high(symbol = referenceSymbol);
+def spxLow = low(symbol = referenceSymbol);
 def spxClose = close(symbol = referenceSymbol);
-def validReferenceBar = !IsNaN(spxClose);
-def closedBarOK = !onlyClosedBars or !IsNaN(spxClose[-1]);
-def eligibleBar = isDaily and validReferenceBar and closedBarOK;
+def validReferenceBar =
+    !IsNaN(spxOpen) and !IsNaN(spxHigh) and
+    !IsNaN(spxLow) and !IsNaN(spxClose) and spxHigh > 0;
+def closedBarOK = if !onlyClosedBars or !IsNaN(spxClose[-1]) then 1 else 0;
+def eligibleBar =
+    if isDaily and validReferenceBar and closedBarOK == 1 then 1 else 0;
 
-def dailyChangePercent =
-    if eligibleBar and !IsNaN(spxClose[1]) and spxClose[1] > 0
-    then 100 * (spxClose / spxClose[1] - 1)
-    else Double.NaN;
-def minorDeclineEvent = dailyChangePercent <= -minorDownDayPercent;
+def barDrawdownPercent =
+    if eligibleBar == 1
+    then 100 * (spxHigh - spxLow) / spxHigh
+    else 0;
+def minorDeclineEvent =
+    if eligibleBar == 0 then 0
+    else if spxClose < spxOpen and
+            barDrawdownPercent >= minorDrawdownPercent
+        then 1
+    else 0;
 
 # Passing the close as both inputs makes correction depth close-to-close.
 # percentage reversal uses a decimal fraction: 5% = 0.05.
@@ -53,17 +63,8 @@ def majorSwingHigh = ZigZagHighLow(
     "atr reversal" = 0
 ).lastH;
 
-def majorSwingLow = ZigZagHighLow(
-    "price h" = spxClose,
-    "price l" = spxClose,
-    "percentage reversal" = majorCorrectionPercent / 100,
-    "absolute reversal" = 0,
-    "atr length" = 5,
-    "atr reversal" = 0
-).lastL;
-
-def majorPeakEvent = eligibleBar and !IsNaN(majorSwingHigh);
-def majorValleyEvent = eligibleBar and !IsNaN(majorSwingLow);
+def majorPeakEvent =
+    if eligibleBar == 1 and !IsNaN(majorSwingHigh) then 1 else 0;
 
 plot MinorDeclineCircle =
     if showMinorDeclineCircles and minorDeclineEvent
@@ -75,24 +76,16 @@ MinorDeclineCircle.SetLineWeight(3);
 MinorDeclineCircle.HideBubble();
 MinorDeclineCircle.HideTitle();
 
-plot MajorPeakArrow = showMajorSwingArrows and majorPeakEvent;
-MajorPeakArrow.SetPaintingStrategy(PaintingStrategy.BOOLEAN_ARROW_DOWN);
-MajorPeakArrow.SetDefaultColor(GlobalColor("MajorPeak"));
-MajorPeakArrow.SetLineWeight(4);
-MajorPeakArrow.HideBubble();
-MajorPeakArrow.HideTitle();
-
-plot MajorValleyArrow = showMajorSwingArrows and majorValleyEvent;
-MajorValleyArrow.SetPaintingStrategy(PaintingStrategy.BOOLEAN_ARROW_UP);
-MajorValleyArrow.SetDefaultColor(GlobalColor("MajorValley"));
-MajorValleyArrow.SetLineWeight(4);
-MajorValleyArrow.HideBubble();
-MajorValleyArrow.HideTitle();
-
-def loadedSessionCount = TotalSum(if eligibleBar then 1 else 0);
-def minorDeclineCount = TotalSum(if minorDeclineEvent then 1 else 0);
+def loadedSessionCount = CompoundValue(1,
+    loadedSessionCount[1] + eligibleBar,
+    eligibleBar);
+def minorDeclineCount = CompoundValue(1,
+    minorDeclineCount[1] + minorDeclineEvent,
+    minorDeclineEvent);
 # Each confirmed peak represents one decline that reached the major threshold.
-def majorCorrectionCount = TotalSum(if majorPeakEvent then 1 else 0);
+def majorCorrectionCount = CompoundValue(1,
+    majorCorrectionCount[1] + majorPeakEvent,
+    majorPeakEvent);
 def minorDeclineRate =
     if loadedSessionCount > 0
     then 100 * minorDeclineCount / loadedSessionCount
@@ -104,7 +97,7 @@ def sessionsPerMajorCorrection =
 
 AddLabel(
     showCountLabels and isDaily,
-    referenceSymbol + " " + minorDownDayPercent + "%+ down days: " +
+    referenceSymbol + " " + minorDrawdownPercent + "%+ bearish high-low bars: " +
         minorDeclineCount + " / " + loadedSessionCount + " (" +
         Round(minorDeclineRate, 1) + "%)",
     GlobalColor("MinorDecline")
@@ -131,4 +124,3 @@ AddLabel(
     "No data for reference symbol " + referenceSymbol,
     GlobalColor("MajorPeak")
 );
-

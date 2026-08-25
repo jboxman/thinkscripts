@@ -1,0 +1,154 @@
+# SPX Weis ZigZag 5% Downswings
+#
+# Reuses the swing-state implementation from gpt_weiswave_zigzag.thinkscript.
+# Once an active downswing reaches declineThresholdPercent, a cloud fills the
+# area between its peak and current price. The cloud remains through the swing
+# low and the count increments once per qualifying downswing.
+#
+# ZigZag pivots remain provisional until reversalAmount confirms them. Current
+# swing state can therefore repaint as the latest pivot moves.
+
+declare upper;
+
+input price = hlc3;
+input declineThresholdPercent = 5.0;
+input reversalSizing = {default atr, manual};
+input manualReversalAmount = 1.0;
+input reversalMode = {default price, percent};
+input atrLength = 20;
+input atrMultiplier = 1.0;
+input atrAverageType = AverageType.EXPONENTIAL;
+input showCloud = yes;
+input showCountLabel = yes;
+
+Assert(declineThresholdPercent > 0 and declineThresholdPercent < 100,
+    "declineThresholdPercent must be greater than zero and less than 100");
+Assert(manualReversalAmount > 0,
+    "manualReversalAmount must be positive: " + manualReversalAmount);
+Assert(atrLength > 0, "atrLength must be positive: " + atrLength);
+Assert(atrMultiplier > 0,
+    "atrMultiplier must be positive: " + atrMultiplier);
+
+DefineGlobalColor("LargeDownswing", CreateColor(120, 35, 45));
+DefineGlobalColor("Label", CreateColor(255, 95, 95));
+
+def usesPriceReversal = reversalMode == reversalMode.price;
+def atr = MovingAverage(
+    atrAverageType,
+    TrueRange(high, close, low),
+    atrLength
+);
+def atrPercent = if close != 0 then 100 * atr / close else 0;
+def reversalAmount =
+    if reversalSizing == reversalSizing.atr
+    then atrMultiplier * (if usesPriceReversal then atr else atrPercent)
+    else manualReversalAmount;
+
+# Weis ZigZag swing state. Keep this block aligned with
+# gpt_weiswave_zigzag.thinkscript.
+def zigZagTrend =
+    if usesPriceReversal
+    then ZigZagTrendSign(price = price, reversalAmount = reversalAmount)
+    else ZigZagTrendPercent(price = price, reversalAmount = reversalAmount);
+def zigZagValue =
+    if usesPriceReversal
+    then ZigZagSign(price = price, reversalAmount = reversalAmount)
+    else ZigZagPercent(price = price, reversalAmount = reversalAmount);
+def isInflection = !IsNaN(zigZagValue);
+
+# ZigZagTrend reports direction entering a pivot. Invert it for direction
+# leaving that pivot.
+def waveDirection = CompoundValue(1,
+    if !isInflection then waveDirection[1]
+    else if IsNaN(zigZagTrend) then waveDirection[1]
+    else if zigZagTrend == -1 then 1
+    else if zigZagTrend == 1 then -1
+    else waveDirection[1],
+    0);
+def startsUpWave =
+    if !isInflection then 0
+    else if waveDirection == 1 then 1
+    else 0;
+def startsDownWave =
+    if !isInflection then 0
+    else if waveDirection == -1 then 1
+    else 0;
+
+def downWavePeak = CompoundValue(1,
+    if startsDownWave then zigZagValue
+    else downWavePeak[1],
+    0);
+def activeDownswingPercent =
+    if waveDirection != -1 then 0
+    else if downWavePeak <= 0 then 0
+    else if IsNaN(price) then 0
+    else 100 * (downWavePeak - price) / downWavePeak;
+def thresholdReached =
+    if waveDirection != -1 then 0
+    else if activeDownswingPercent >= declineThresholdPercent then 1
+    else 0;
+
+# Latch qualification for the rest of the wave. A partial rebound cannot count
+# the same downswing twice or briefly remove its cloud.
+def downWaveQualified = CompoundValue(1,
+    if startsDownWave then 0
+    else if startsUpWave then 0
+    else if waveDirection == -1 and
+            (downWaveQualified[1] == 1 or thresholdReached)
+        then 1
+    else downWaveQualified[1],
+    0);
+def largeDownswingEvent =
+    if waveDirection != -1 then 0
+    else if thresholdReached == 0 then 0
+    else if downWaveQualified[1] == 0 then 1
+    else 0;
+def activeLargeDownswing =
+    if waveDirection == -1 and downWaveQualified == 1 then 1 else 0;
+def completedLargeDownswing =
+    if startsUpWave == 1 and downWaveQualified[1] == 1 then 1 else 0;
+
+plot CloudTop =
+    if showCloud and activeLargeDownswing then downWavePeak
+    else if showCloud and completedLargeDownswing then downWavePeak[1]
+    else Double.NaN;
+CloudTop.SetDefaultColor(GlobalColor("LargeDownswing"));
+CloudTop.HideBubble();
+CloudTop.HideTitle();
+
+plot CloudBottom =
+    if showCloud and (activeLargeDownswing or completedLargeDownswing)
+    then price
+    else Double.NaN;
+CloudBottom.SetDefaultColor(GlobalColor("LargeDownswing"));
+CloudBottom.HideBubble();
+CloudBottom.HideTitle();
+
+AddCloud(
+    CloudTop,
+    CloudBottom,
+    GlobalColor("LargeDownswing"),
+    GlobalColor("LargeDownswing")
+);
+
+# Recursive count stays numeric on expansion bars; TotalSum can become NaN when
+# its event series inherits NaN from provisional ZigZag state.
+def largeDownswingCount = CompoundValue(1,
+    if IsNaN(largeDownswingCount[1])
+    then largeDownswingEvent
+    else largeDownswingCount[1] + largeDownswingEvent,
+    0);
+
+AddLabel(
+    showCountLabel,
+    GetSymbol() + " Weis downswings >= " +
+        AsText(Round(declineThresholdPercent, 1)) + "%: " +
+        AsText(Round(largeDownswingCount, 0)),
+    GlobalColor("Label")
+);
+
+AddLabel(
+    showCountLabel and activeLargeDownswing,
+    "Active downswing: " + Round(activeDownswingPercent, 1) + "%",
+    GlobalColor("Label")
+);
