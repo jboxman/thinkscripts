@@ -1,0 +1,67 @@
+#
+# Readable Relative Daily Volume
+#
+# Normalizes each session against the prior rolling median, then applies a log
+# transform. This preserves spike ordering without letting outliers flatten the
+# rest of the visible histogram.
+#
+
+# This is a slight improvement, but we lose absolute volume information in the
+# study header. This approach distorts bars that are largeish but not an issue.
+
+# Abandoned.
+
+declare lower;
+declare zerobase;
+
+input baselineLength = 50;
+input spikePercent = 400;
+
+Assert(baselineLength > 0, "baselineLength must be greater than zero");
+Assert(spikePercent > 0, "spikePercent must be greater than zero");
+
+def isDailyChart = GetAggregationPeriod() == AggregationPeriod.DAY;
+def hasVolume = !IsNaN(volume);
+def baselineVolume = Median(volume[1], baselineLength);
+def hasBaseline = !IsNaN(baselineVolume) and baselineVolume > 0;
+def volumeRatio = volume / baselineVolume;
+def displayedVolume = Log(1 + volumeRatio) / Log(2);
+def isSpike = hasVolume and hasBaseline and
+    volumeRatio > spikePercent / 100;
+def isUpBar = close >= open;
+
+DefineGlobalColor("Up", CreateColor(0, 197, 49));
+DefineGlobalColor("Down", CreateColor(255, 95, 95));
+
+plot VolumeBars = if isDailyChart and hasVolume and hasBaseline
+    then displayedVolume
+    else Double.NaN;
+plot BaselineLine = if isDailyChart and hasVolume and hasBaseline
+    then 1
+    else Double.NaN;
+plot SpikeMarker = if isDailyChart and isSpike
+    then displayedVolume
+    else Double.NaN;
+
+VolumeBars.SetPaintingStrategy(PaintingStrategy.HISTOGRAM);
+VolumeBars.SetLineWeight(3);
+VolumeBars.AssignValueColor(
+    if isUpBar then GlobalColor("Up")
+    else GlobalColor("Down")
+);
+VolumeBars.HideBubble();
+
+BaselineLine.SetDefaultColor(Color.LIGHT_GRAY);
+BaselineLine.SetLineWeight(2);
+BaselineLine.HideBubble();
+
+SpikeMarker.SetPaintingStrategy(PaintingStrategy.POINTS);
+SpikeMarker.SetDefaultColor(Color.YELLOW);
+SpikeMarker.SetLineWeight(5);
+SpikeMarker.HideBubble();
+
+AddLabel(
+    !isDailyChart,
+    "Warning: use daily aggregation",
+    Color.YELLOW
+);
