@@ -1,0 +1,87 @@
+# Saty ATR Levels - minimal ThinkScript port
+#
+# Original concept: Saty ATR Levels by TradingView user satymahajan.
+# Pine source licensed under Mozilla Public License 2.0.
+# This port keeps only the prior-period close +/- ATR Fibonacci map.
+
+declare upper;
+
+input levelPeriod = AggregationPeriod.DAY;
+input atrLength = 14;
+input averageType = AverageType.WILDERS;
+input lineWeight = 2;
+
+def periodSupported = GetAggregationPeriod() <= levelPeriod;
+def periodHigh = high(period = levelPeriod);
+def periodLow = low(period = levelPeriod);
+def periodClose = close(period = levelPeriod);
+
+# [1] locks every level to the previous completed aggregation period.
+def referenceClose = periodClose[1];
+def atr = MovingAverage(
+    averageType,
+    TrueRange(periodHigh, periodClose, periodLow),
+    atrLength
+)[1];
+
+plot PDC = if periodSupported then referenceClose else Double.NaN;
+plot Upper236 = if periodSupported then referenceClose + atr * 0.236 else Double.NaN;
+plot Lower236 = if periodSupported then referenceClose - atr * 0.236 else Double.NaN;
+plot Upper382 = if periodSupported then referenceClose + atr * 0.382 else Double.NaN;
+plot Lower382 = if periodSupported then referenceClose - atr * 0.382 else Double.NaN;
+plot Upper500 = if periodSupported then referenceClose + atr * 0.500 else Double.NaN;
+plot Lower500 = if periodSupported then referenceClose - atr * 0.500 else Double.NaN;
+plot Upper618 = if periodSupported then referenceClose + atr * 0.618 else Double.NaN;
+plot Lower618 = if periodSupported then referenceClose - atr * 0.618 else Double.NaN;
+plot Upper786 = if periodSupported then referenceClose + atr * 0.786 else Double.NaN;
+plot Lower786 = if periodSupported then referenceClose - atr * 0.786 else Double.NaN;
+plot Upper1000 = if periodSupported then referenceClose + atr else Double.NaN;
+plot Lower1000 = if periodSupported then referenceClose - atr else Double.NaN;
+
+PDC.SetDefaultColor(Color.WHITE);
+Upper236.SetDefaultColor(Color.GREEN);
+Lower236.SetDefaultColor(Color.RED);
+Upper382.SetDefaultColor(Color.YELLOW);
+Lower382.SetDefaultColor(Color.YELLOW);
+Upper500.SetDefaultColor(Color.ORANGE);
+Lower500.SetDefaultColor(Color.ORANGE);
+Upper618.SetDefaultColor(Color.YELLOW);
+Lower618.SetDefaultColor(Color.YELLOW);
+Upper786.SetDefaultColor(Color.ORANGE);
+Lower786.SetDefaultColor(Color.ORANGE);
+Upper1000.SetDefaultColor(Color.WHITE);
+Lower1000.SetDefaultColor(Color.WHITE);
+
+PDC.SetLineWeight(lineWeight);
+Upper236.SetLineWeight(lineWeight);
+Lower236.SetLineWeight(lineWeight);
+Upper382.SetLineWeight(lineWeight);
+Lower382.SetLineWeight(lineWeight);
+Upper500.SetLineWeight(lineWeight);
+Lower500.SetLineWeight(lineWeight);
+Upper618.SetLineWeight(lineWeight);
+Lower618.SetLineWeight(lineWeight);
+Upper786.SetLineWeight(lineWeight);
+Lower786.SetLineWeight(lineWeight);
+Upper1000.SetLineWeight(lineWeight);
+Lower1000.SetLineWeight(lineWeight);
+
+PDC.SetPaintingStrategy(PaintingStrategy.HORIZONTAL);
+Upper236.SetPaintingStrategy(PaintingStrategy.HORIZONTAL);
+Lower236.SetPaintingStrategy(PaintingStrategy.HORIZONTAL);
+Upper382.SetPaintingStrategy(PaintingStrategy.HORIZONTAL);
+Lower382.SetPaintingStrategy(PaintingStrategy.HORIZONTAL);
+Upper500.SetPaintingStrategy(PaintingStrategy.HORIZONTAL);
+Lower500.SetPaintingStrategy(PaintingStrategy.HORIZONTAL);
+Upper618.SetPaintingStrategy(PaintingStrategy.HORIZONTAL);
+Lower618.SetPaintingStrategy(PaintingStrategy.HORIZONTAL);
+Upper786.SetPaintingStrategy(PaintingStrategy.HORIZONTAL);
+Lower786.SetPaintingStrategy(PaintingStrategy.HORIZONTAL);
+Upper1000.SetPaintingStrategy(PaintingStrategy.HORIZONTAL);
+Lower1000.SetPaintingStrategy(PaintingStrategy.HORIZONTAL);
+
+AddLabel(
+    !periodSupported,
+    "Level period must be at least as large as chart aggregation",
+    Color.RED
+);
