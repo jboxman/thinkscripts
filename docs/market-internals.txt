@@ -1,15 +1,14 @@
-# https://tlc.thinkorswim.com/center/release/rel-07-20-2013 | < 404 >
-# Technical Notes
-# We have added a huge number of new technical indicators.
-# Here are all of the details:
+# Authoritative source: https://kb.dxfeed.com/en/data/calculated-data/access-to-dxfeed-market-indicators.html
+# ThinkOrSwim market-internal symbols supplied by dxFeed.
+# Most indicators are numeric; dxFeed publishes their main value in the TimeAndSale Price field.
+# Top-gainer/loser indicators publish ticker lists through the Configuration event.
 # The New York Stock Exchange (NYSE) is a physical and electronic stock exchange, while NYSE Arca is an electronic communications network (ECN) used for matching orders.
 # Definitions
-# Composite Markets - traded anywhere
-# Primary Markets – AMEX, ARCA, NASDAQ, NYSE
-# Advancing issues – Issues that have a positive net change from previous "trading day’s close" (?)
-# Declining issues – Issues that have a negative net change from previous "trading day’s close" (?)
-# $TICK – Number of issues that have a positive change from previous trade minus number of issues that have a negative change from previous trade
-# $TRIN – Volume of advancing issues divided by the volume of declining issues
+# Composite indicators include trades from all CTA/UTP participants; non-composite indicators use the listing market.
+# Advancing issues – Issues trading above the previous trading day's close
+# Declining issues – Issues trading below the previous trading day's close
+# $TICK – Number of stocks on an uptick minus number of stocks on a downtick
+# $TRIN – Short-Term Trading Indicator (Arms Index)
 #=======================================================================================================
 
 # All USA stocks: Primary Markets only
@@ -310,21 +309,130 @@
 # $ETFLO9M ETF New Lows  9M
 # $ETFLOW  ETF New Lows  1Y
 
-# OCC Put/Call Ratios
+# DJIA New Highs/Lows
+# $HII1W  DJIA New Highs 1W
+# $HII2W  DJIA New Highs 2W
+# $HII1M  DJIA New Highs 1M
+# $HII3M  DJIA New Highs 3M
+# $HII6M  DJIA New Highs 6M
+# $HII9M  DJIA New Highs 9M
+# $HGHI    DJIA New Highs 1Y
+# $LOI1W  DJIA New Lows  1W
+# $LOI2W  DJIA New Lows  2W
+# $LOI1M  DJIA New Lows  1M
+# $LOI3M  DJIA New Lows  3M
+# $LOI6M  DJIA New Lows  6M
+# $LOI9M  DJIA New Lows  9M
+# $LOWI    DJIA New Lows  1Y
+
+# NASDAQ 100 New Highs/Lows
+# $HIND1W NASDAQ 100 New Highs 1W
+# $HIND2W NASDAQ 100 New Highs 2W
+# $HIND1M NASDAQ 100 New Highs 1M
+# $HIND3M NASDAQ 100 New Highs 3M
+# $HIND6M NASDAQ 100 New Highs 6M
+# $HIND9M NASDAQ 100 New Highs 9M
+# $HGHND   NASDAQ 100 New Highs 1Y
+# $LOND1W NASDAQ 100 New Lows  1W
+# $LOND2W NASDAQ 100 New Lows  2W
+# $LOND1M NASDAQ 100 New Lows  1M
+# $LOND3M NASDAQ 100 New Lows  3M
+# $LOND6M NASDAQ 100 New Lows  6M
+# $LOND9M NASDAQ 100 New Lows  9M
+# $LOWND   NASDAQ 100 New Lows  1Y
+
+# RUSSELL 2000 New Highs/Lows
+# $HIRL1W RUSSELL 2000 New Highs 1W
+# $HIRL2W RUSSELL 2000 New Highs 2W
+# $HIRL1M RUSSELL 2000 New Highs 1M
+# $HIRL3M RUSSELL 2000 New Highs 3M
+# $HIRL6M RUSSELL 2000 New Highs 6M
+# $HIRL9M RUSSELL 2000 New Highs 9M
+# $HGHRL   RUSSELL 2000 New Highs 1Y
+# $LORL1W RUSSELL 2000 New Lows  1W
+# $LORL2W RUSSELL 2000 New Lows  2W
+# $LORL1M RUSSELL 2000 New Lows  1M
+# $LORL3M RUSSELL 2000 New Lows  3M
+# $LORL6M RUSSELL 2000 New Lows  6M
+# $LORL9M RUSSELL 2000 New Lows  9M
+# $LOWRL   RUSSELL 2000 New Lows  1Y
+
+# S&P 500 New Highs/Lows
+# $HISP1W S&P 500 New Highs 1W
+# $HISP2W S&P 500 New Highs 2W
+# $HISP1M S&P 500 New Highs 1M
+# $HISP3M S&P 500 New Highs 3M
+# $HISP6M S&P 500 New Highs 6M
+# $HISP9M S&P 500 New Highs 9M
+# $HGHSP   S&P 500 New Highs 1Y
+# $LOSP1W S&P 500 New Lows  1W
+# $LOSP2W S&P 500 New Lows  2W
+# $LOSP1M S&P 500 New Lows  1M
+# $LOSP3M S&P 500 New Lows  3M
+# $LOSP6M S&P 500 New Lows  6M
+# $LOSP9M S&P 500 New Lows  9M
+# $LOWSP   S&P 500 New Lows  1Y
+
+# All USA New Highs/Lows
+# $USHI1W ALLUSA New Highs 1W
+# $USHI2W ALLUSA New Highs 2W
+# $USHI1M ALLUSA New Highs 1M
+# $USHI3M ALLUSA New Highs 3M
+# $USHI6M ALLUSA New Highs 6M
+# $USHI9M ALLUSA New Highs 9M
+# $USHGH   ALLUSA New Highs 1Y
+# $USLO1W ALLUSA New Lows  1W
+# $USLO2W ALLUSA New Lows  2W
+# $USLO1M ALLUSA New Lows  1M
+# $USLO3M ALLUSA New Lows  3M
+# $USLO6M ALLUSA New Lows  6M
+# $USLO9M ALLUSA New Lows  9M
+# $USLOW   ALLUSA New Lows  1Y
+
+# Put/Call Ratios
+# $CPC   Put/Call ratio for Cboe Total
+# $CPCE  Put/Call ratio for Cboe Equity
+# $CPCI  Put/Call ratio for Cboe Index
+# $PCA   Put/Call ratio for options on NYSE MKT (AMEX) equities
+# $PCAR  Put/Call ratio for options on ARCA equities
+# $PCN   Put/Call ratio for options on NYSE equities
+# $PCN/Q Put/Call ratio for options on NASDAQ equities
 # $PCALL Put/Call ratio for all OCC options
 # $PCI   Put/Call ratio for all DJIA constituent options
 # $PCRL  Put/Call ratio for all Russell 2000 constituent options
 # $PCSP  Put/Call ratio for all S&P 500 constituent options
 # $PCND  Put/Call ratio for all NASDAQ 100 constituent options
 
+# Top Gainers/Losers (ticker lists, not numeric series)
+# Listed by dxFeed but unavailable in ThinkOrSwim; requests hang and return no data.
+# $TOP10G/Q  NASDAQ Top 10 gainers by absolute net change
+# $TOP10GI   DJIA Top 10 gainers by absolute net change
+# $TOP10GN   NYSE Top 10 gainers by absolute net change
+# $TOP10GSP  S&P 500 Top 10 gainers by absolute net change
+# $TOP10GUS  ALLUSA Top 10 gainers by absolute net change
+# $TOP10L/Q  NASDAQ Top 10 losers by absolute net change
+# $TOP10LI   DJIA Top 10 losers by absolute net change
+# $TOP10LN   NYSE Top 10 losers by absolute net change
+# $TOP10LSP  S&P 500 Top 10 losers by absolute net change
+# $TOP10LUS  ALLUSA Top 10 losers by absolute net change
+# $TOP10PG/Q NASDAQ Top 10 gainers by relative net change
+# $TOP10PGI  DJIA Top 10 gainers by relative net change
+# $TOP10PGN  NYSE Top 10 gainers by relative net change
+# $TOP10PGSP S&P 500 Top 10 gainers by relative net change
+# $TOP10PGUS ALLUSA Top 10 gainers by relative net change
+# $TOP10PL/Q NASDAQ Top 10 losers by relative net change
+# $TOP10PLI  DJIA Top 10 losers by relative net change
+# $TOP10PLN  NYSE Top 10 losers by relative net change
+# $TOP10PLSP S&P 500 Top 10 losers by relative net change
+# $TOP10PLUS ALLUSA Top 10 losers by relative net change
+# $TOP10V/Q  NASDAQ Top 10 gainers by volume
+# $TOP10VI   DJIA Top 10 gainers by volume
+# $TOP10VN   NYSE Top 10 gainers by volume
+# $TOP10VSP  S&P 500 Top 10 gainers by volume
+# $TOP10VUS  ALLUSA Top 10 gainers by volume
+# $TOP25VOTC Top 25 gainers by volume from OTCBB/OTC Markets exchanges
+
 # S&P 500 Percent of Stocks Above Moving Average
 # $SPXA50R  Percent of S&P 500 stocks above their 50-day simple moving average
 # $SPXA100R Percent of S&P 500 stocks above their 100-day simple moving average
 # $SPXA200R Percent of S&P 500 stocks above their 200-day simple moving average
- 
-# Definitions
-# Primary Markets – AMEX, ARCA, NASDAQ, NYSE
-# Advancing issues – Issues that have a positive net change from previous trading day’s close
-# Declining issues – Issues that have a negative net change from previous trading day’s close
-# $TICK – Number of issues that have a positive change from previous trade minus number of issues that have a negative change from previous trade
-# $TRIN – Volume of advancing issues divided by the volume of declining issues
