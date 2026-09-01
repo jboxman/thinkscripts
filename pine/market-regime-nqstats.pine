@@ -1,0 +1,72 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © lucymatos
+
+//@version=6
+indicator("Market Regime — nqstats", overlay=true, max_bars_back=5000)
+
+// ================= Regime inputs =================
+useLog = input.bool(true, "Log returns", group="Regime")
+L1 = input.int(10, "Lookback 1 (bars)", minval=2, group="Regime")
+L2 = input.int(20, "Lookback 2 (bars)", minval=2, group="Regime")
+L3 = input.int(50, "Lookback 3 (bars)", minval=2, group="Regime")
+
+// ================= Baseline =================
+baseYears = input.float(10.0, "Baseline lookback (years)", minval=0.5, step=0.5, group="Baseline")
+
+// ================= Trend =================
+trendWin = input.int(5,    "Trend window (days)",   minval=1,   group="Trend")
+trendThr = input.float(0.05,"Trend deadband (ratio)", minval=0.0, step=0.01, group="Trend")
+
+// ================= Table style =================
+txtColor = input.color(color.new(#000000, 0), "Text colour", group="Table")
+posSel   = input.string("Bottom Right", "Location", group="Table", options=["Top Left","Top Center","Top Right","Middle Left","Middle Center","Middle Right","Bottom Left","Bottom Center","Bottom Right"])
+sizeSel  = input.string("Small", "Text size", group="Table", options=["Tiny","Small","Normal","Large","Huge"])
+
+f_pos(s) =>
+    s=="Top Left"?position.top_left : s=="Top Center"?position.top_center : s=="Top Right"?position.top_right : s=="Middle Left"?position.middle_left : s=="Middle Center"?position.middle_center : s=="Middle Right"?position.middle_right : s=="Bottom Left"?position.bottom_left : s=="Bottom Center"?position.bottom_center : position.bottom_right
+f_size(s) =>
+    s=="Tiny"?size.tiny : s=="Small"?size.small : s=="Large"?size.large : s=="Huge"?size.huge : size.normal
+
+trailLen = math.max(30, math.round(baseYears * 252))
+
+// ================= Per-lookback calc (on daily series) =================
+f_one(r, L, baseSD) =>
+    sd = ta.stdev(r, L)
+    q  = na(baseSD) or baseSD == 0 ? na : sd / baseSD
+    p  = ta.percentrank(sd, trailLen)          // percentile of current vol vs its own history
+    tr = q - q[trendWin]                        // ratio change over the trend window
+    [sd, q, p, tr]
+
+f_calc() =>
+    r = useLog ? math.log(close / close[1]) : close / close[1] - 1.0
+    baseSD = ta.stdev(r, trailLen)
+    nB = math.min(bar_index + 1, trailLen)
+    [s1, q1, p1, t1] = f_one(r, L1, baseSD)
+    [s2, q2, p2, t2] = f_one(r, L2, baseSD)
+    [s3, q3, p3, t3] = f_one(r, L3, baseSD)
+    [baseSD, nB, s1,q1,p1,t1, s2,q2,p2,t2, s3,q3,p3,t3]
+
+[baseSD, nB, s1,q1,p1,t1, s2,q2,p2,t2, s3,q3,p3,t3] = request.security(syminfo.tickerid, "D", f_calc(), lookahead=barmerge.lookahead_off)
+
+// ================= Formatting helpers =================
+f_state(x)  => na(x) ? "--" : x > 1.0 ? "Elevated" : "Compressed"
+// COMPR reads compression, not ratio: ratio falling => vol contracting => compression BUILDing
+f_compr(tr) => na(tr) ? "--" : tr < -trendThr ? "BUILD" : tr > trendThr ? "EASE" : "HOLD"
+f_num(x, fmt) => na(x) ? "--" : str.tostring(x, fmt)
+f_pct(x)    => na(x) ? "--" : str.tostring(math.round(x)) + "%"
+
+head = na(t2) ? "--" : t2 < -trendThr ? "COMPRESSING" : t2 > trendThr ? "EXPANDING" : "STABLE"
+
+// ================= Table =================
+tCol = txtColor
+tSz  = f_size(sizeSel)
+var table t = table.new(f_pos(posSel), 6, 6, border_width=0, frame_width=0)
+f_cell(c, row, s) => table.cell(t, c, row, s, text_color=tCol, text_size=tSz, text_font_family=font.family_monospace, bgcolor=color.new(color.black, 100))
+
+if barstate.islast
+    f_cell(0,0,"LOOKBACK"), f_cell(1,0,"STATE"), f_cell(2,0,"RATIO"), f_cell(3,0,"%ILE"), f_cell(4,0,"COMPR"), f_cell(5,0,"ROLLSD")
+    f_cell(0,1,str.tostring(L1)+"d"), f_cell(1,1,f_state(q1)), f_cell(2,1,f_num(q1,"#.##")), f_cell(3,1,f_pct(p1)), f_cell(4,1,f_compr(t1)), f_cell(5,1,f_num(s1,"#.####"))
+    f_cell(0,2,str.tostring(L2)+"d"), f_cell(1,2,f_state(q2)), f_cell(2,2,f_num(q2,"#.##")), f_cell(3,2,f_pct(p2)), f_cell(4,2,f_compr(t2)), f_cell(5,2,f_num(s2,"#.####"))
+    f_cell(0,3,str.tostring(L3)+"d"), f_cell(1,3,f_state(q3)), f_cell(2,3,f_num(q3,"#.##")), f_cell(3,3,f_pct(p3)), f_cell(4,3,f_compr(t3)), f_cell(5,3,f_num(s3,"#.####"))
+    f_cell(0,4,"OVERALL"), f_cell(1,4,head), f_cell(2,4,""), f_cell(3,4,""), f_cell(4,4,""), f_cell(5,4,"")
+    f_cell(0,5,"BASE SD"), f_cell(1,5,f_num(baseSD,"#.####")), f_cell(2,5,"BARS"), f_cell(3,5,str.tostring(nB)), f_cell(4,5,""), f_cell(5,5,"")
