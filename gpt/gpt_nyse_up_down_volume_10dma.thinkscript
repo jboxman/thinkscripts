@@ -1,0 +1,32 @@
+# NYSE Up / Down Volume 10-Day Averages
+# StockCharts equivalents: 10-day SMAs of $NYUPV and $NYDNV.
+# Values are displayed in millions of shares. Apply to a DAILY chart.
+
+declare lower;
+declare hide_on_intraday;
+
+input length = 10;
+input volumeScale = 1000000;
+
+def upVolume = close("$UVOLC") / volumeScale;
+def downVolume = close("$DVOLC") / volumeScale;
+
+plot UpVolumeAverage = Average(upVolume, length);
+UpVolumeAverage.SetDefaultColor(Color.BLUE);
+UpVolumeAverage.SetLineWeight(2);
+
+plot DownVolumeAverage = Average(downVolume, length);
+DownVolumeAverage.SetDefaultColor(Color.RED);
+DownVolumeAverage.SetLineWeight(2);
+
+AddLabel(
+    yes,
+    "NYSE UP VOL " + length + "D " + Round(UpVolumeAverage, 1) + "M",
+    Color.BLUE
+);
+
+AddLabel(
+    yes,
+    "NYSE DOWN VOL " + length + "D " + Round(DownVolumeAverage, 1) + "M",
+    Color.RED
+);

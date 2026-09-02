@@ -1,0 +1,25 @@
+# NYSE Net Volume 10-Day Average
+# StockCharts equivalent: 10-day SMA of $NYUPV - $NYDNV.
+# Values are displayed in millions of shares. Apply to a DAILY chart.
+
+declare lower;
+declare hide_on_intraday;
+
+input length = 10;
+input volumeScale = 1000000;
+
+def netVolume = (close("$UVOLC") - close("$DVOLC")) / volumeScale;
+
+plot NetVolumeAverage = Average(netVolume, length);
+NetVolumeAverage.SetDefaultColor(Color.LIGHT_GRAY);
+NetVolumeAverage.SetLineWeight(2);
+
+plot ZeroLine = 0;
+ZeroLine.SetDefaultColor(Color.GRAY);
+ZeroLine.SetStyle(Curve.LONG_DASH);
+
+AddLabel(
+    yes,
+    "NYSE NET VOL " + length + "D " + Round(NetVolumeAverage, 1) + "M",
+    if NetVolumeAverage >= 0 then Color.GREEN else Color.RED
+);

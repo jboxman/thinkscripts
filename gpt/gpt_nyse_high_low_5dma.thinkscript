@@ -1,0 +1,25 @@
+# NYSE New Highs / New Lows 5-Day Average
+# StockCharts equivalent: 5-day SMA of $NYHL.
+# Thinkorswim exposes the 52-week high and low counts separately.
+# Apply to a DAILY chart.
+
+declare lower;
+declare hide_on_intraday;
+
+input length = 5;
+
+def highLowIndex = close("$NYHGH") - close("$NYLOW");
+
+plot HighLowAverage = Average(highLowIndex, length);
+HighLowAverage.SetDefaultColor(Color.BLUE);
+HighLowAverage.SetLineWeight(2);
+
+plot ZeroLine = 0;
+ZeroLine.SetDefaultColor(Color.GRAY);
+ZeroLine.SetStyle(Curve.LONG_DASH);
+
+AddLabel(
+    yes,
+    "NYSE HIGH-LOW " + length + "D " + Round(HighLowAverage, 0),
+    if HighLowAverage >= 0 then Color.GREEN else Color.RED
+);

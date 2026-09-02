@@ -1,0 +1,24 @@
+# NYSE Advance / Decline 10-Day Average
+# StockCharts equivalent: 10-day SMA of $NYAD.
+# Apply to a DAILY chart.
+
+declare lower;
+declare hide_on_intraday;
+
+input length = 10;
+
+def advanceDecline = close("$ADDC");
+
+plot AdvanceDeclineAverage = Average(advanceDecline, length);
+AdvanceDeclineAverage.SetDefaultColor(Color.GREEN);
+AdvanceDeclineAverage.SetLineWeight(2);
+
+plot ZeroLine = 0;
+ZeroLine.SetDefaultColor(Color.GRAY);
+ZeroLine.SetStyle(Curve.LONG_DASH);
+
+AddLabel(
+    yes,
+    "NYSE A/D " + length + "D " + Round(AdvanceDeclineAverage, 0),
+    if AdvanceDeclineAverage >= 0 then Color.GREEN else Color.RED
+);
