@@ -1,0 +1,52 @@
+# CBOE Equity Put/Call Ratio with 10-Day SMA
+# Use on a daily time chart. Low ratios indicate optimism/complacency and are
+# treated as contrarian-bearish; high ratios indicate pessimism/fear and are
+# treated as contrarian-bullish. Plots are negated so low ratios appear at the
+# top of the panel, matching the reversed scale used in the reference chart.
+
+declare lower;
+
+input ratioSymbol = "$CPCE";
+input averageLength = 10;
+input optimismLevel = 0.50;
+input pessimismLevel = 0.70;
+input showZones = yes;
+
+def isDaily = GetAggregationPeriod() == AggregationPeriod.DAY;
+def ratio = close(symbol = ratioSymbol, period = AggregationPeriod.DAY);
+def ratioAverage = Average(ratio, averageLength);
+
+plot PutCallRatio = -ratio;
+PutCallRatio.SetDefaultColor(Color.PINK);
+PutCallRatio.SetPaintingStrategy(PaintingStrategy.HISTOGRAM);
+PutCallRatio.SetLineWeight(1);
+
+plot TenDaySMA = -ratioAverage;
+TenDaySMA.SetDefaultColor(Color.BLUE);
+TenDaySMA.SetLineWeight(3);
+
+plot Optimism = -optimismLevel;
+Optimism.SetDefaultColor(Color.RED);
+Optimism.SetStyle(Curve.SHORT_DASH);
+
+plot Pessimism = -pessimismLevel;
+Pessimism.SetDefaultColor(Color.GREEN);
+Pessimism.SetStyle(Curve.SHORT_DASH);
+
+def upperZone = if showZones then Double.POSITIVE_INFINITY else Double.NaN;
+def lowerZone = if showZones then Double.NEGATIVE_INFINITY else Double.NaN;
+
+AddCloud(upperZone, -optimismLevel, CreateColor(255, 235, 130), CreateColor(255, 235, 130));
+AddCloud(-pessimismLevel, lowerZone, CreateColor(190, 225, 200), CreateColor(190, 225, 200));
+
+AddLabel(
+    yes,
+    ratioSymbol + " " + AsText(Round(ratio, 3)) +
+        " | " + AsText(averageLength) + "D SMA " + AsText(Round(ratioAverage, 3)),
+    if IsNaN(ratio) then Color.GRAY
+    else if ratioAverage <= optimismLevel then Color.RED
+    else if ratioAverage >= pessimismLevel then Color.GREEN
+    else Color.YELLOW
+);
+
+AddLabel(!isDaily, "Set chart aggregation to Daily", Color.ORANGE);
